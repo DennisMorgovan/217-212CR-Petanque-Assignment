@@ -9,6 +9,7 @@
 #endif 
 
 #include<vector>
+#include<iostream>
 
 #define MAXVERT 50000
 
@@ -26,7 +27,7 @@ struct Face
 	int id3;
 };
 
-struct TextureFace
+struct UV
 {
 	float x;
 	float y;
@@ -34,15 +35,24 @@ struct TextureFace
 
 class Object
 {
+private:
+	FILE *fp; //Pointer to the file
+	char* filename;
+	int read; //Integer used to determine the amount of items that are read per line. It is used in conjunction with fscanf, which returns the number of elements read per line
+	char lineHeader[10]; //characters that start at the beginning of every .obj file line
 public:
-	Vertex vertices[MAXVERT], normals[MAXVERT]; //Arrays of vertices, texture vertices and normal vertices
+	Vertex verticeCoords[MAXVERT], normals[MAXVERT]; //Arrays of vertices, texture vertices and normal vertices
 	Face facesCoords[MAXVERT], normalsCoords[MAXVERT], textureCoords[MAXVERT]; //Coordinates for faces, normals and textures
-	TextureFace textureFaces[MAXVERT];
-	int faceNumber, vertexNumber; //Total number of faces and vertices
+	UV uv[MAXVERT];
+	int faceNumber, vertexCoordsNumber, vertexNumber; //Total number of faces and vertices
 
-	Object();
+	float tempVerticesArray[MAXVERT];
+	float* finalVertices;
+
+	Object(char* filename);
 	~Object();
 
+	void LoadObject();
 	void DrawObject();
 };
 
