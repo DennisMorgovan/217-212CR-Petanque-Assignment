@@ -40,5 +40,7 @@ public:
 	void update(float angle, float camX, float camZ, int deltaTime);
 
 	void passiveMotionFunc(int x, int y);
+
+	glm::mat4 getModelViewMat();
 };
 

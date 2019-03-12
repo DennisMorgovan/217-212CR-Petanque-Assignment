@@ -8,7 +8,7 @@ Camera::Camera()
 
 Camera::Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far)
 {
-	cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+	cameraPos = glm::vec3(0.0f, 0.0f, 10.0f);
 	cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
 	cameraDirection = glm::normalize(cameraPos - cameraTarget);
 	up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -39,14 +39,7 @@ Camera::~Camera()
 
 void Camera::update(float angle, float camX, float camZ, int deltaTime)
 {
-	/*glm::mat4 modelViewMat(1.0f);
-	cameraPos = glm::vec3(camX, 0.0f, camZ);
-	view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
-
-	glUniformMatrix4fv(modelViewMatLoc, 1, GL_FALSE, value_ptr(view));*/
-
-	//speed *= deltaTime;
-
+	//Rotates the camera view up/down/left/right based on mouse input
 	cameraFront.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
 	cameraFront.y = sin(glm::radians(pitch));
 	cameraFront.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));	
@@ -56,7 +49,7 @@ void Camera::update(float angle, float camX, float camZ, int deltaTime)
 
 	if (specialKeys[GLUT_KEY_UP]) { //Adding deltaTime makes the current speed magnitude static?
 		cameraPos += deltaSpeed * cameraFront;
-		std::cout << "Moving forward! " << std::endl;
+		//std::cout << "Moving forward! " << std::endl;
 	}
 	else if (specialKeys[GLUT_KEY_DOWN]) {
 		cameraPos -= deltaSpeed * cameraFront;
@@ -72,13 +65,15 @@ void Camera::update(float angle, float camX, float camZ, int deltaTime)
 
 	view = glm::mat4(1.0f);
 	//cameraPos = glm::vec3(camX, 0.0f, camZ);
-	view = glm::rotate(view, angle, glm::vec3(0.0, 1.0, 0.0));
+	//view = glm::rotate(view, angle, glm::vec3(0.0, 1.0, 0.0));
 	view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	glUniformMatrix4fv(modelViewMatLoc, 1, GL_FALSE, value_ptr(view));
 }
 
 void Camera::passiveMotionFunc(int x, int y)
 {
+	//Generates mouse input and modifies the pitch/yaw
+
 	float xoffset = x - lastX;
 	float yoffset = lastY - y; // reversed since y-coordinates range from bottom to top
 
@@ -96,5 +91,11 @@ void Camera::passiveMotionFunc(int x, int y)
 	if (pitch < -89.0f)
 		pitch = -89.0f;
 
+	//if (x != 960 || y != 540) glutWarpPointer(960, 540);
+}
 
+//Getter for the model view matrix
+glm::mat4 Camera::getModelViewMat()
+{
+	return view;
 }

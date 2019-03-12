@@ -37,22 +37,23 @@ class Object
 {
 private:
 	FILE *fp; //Pointer to the file
-	char* filename;
 	int read; //Integer used to determine the amount of items that are read per line. It is used in conjunction with fscanf, which returns the number of elements read per line
 	char lineHeader[10]; //characters that start at the beginning of every .obj file line
 public:
 	Vertex verticeCoords[MAXVERT], normals[MAXVERT]; //Arrays of vertices, texture vertices and normal vertices
 	Face facesCoords[MAXVERT], normalsCoords[MAXVERT], textureCoords[MAXVERT]; //Coordinates for faces, normals and textures
 	UV uv[MAXVERT];
-	int faceNumber, vertexCoordsNumber, vertexNumber; //Total number of faces and vertices
+	int faceNumber, vertexCoordsNumber, vertexNumber, uvNumber, finalVerticesVertexNumber; //Total number of faces and vertices
 
-	float tempVerticesArray[MAXVERT];
+	float tempVerticesArray[MAXVERT], tempUVArray[MAXVERT];
 	float* finalVertices;
 
-	Object(char* filename);
+	Object();
 	~Object();
 
-	void LoadObject();
-	void DrawObject();
+	void LoadObject(char* filename);
+
+	void SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex);
+	void DrawObject(unsigned int vao, static unsigned int objectLoc, static enum object obj);
 };
 
