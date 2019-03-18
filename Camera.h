@@ -17,13 +17,22 @@
 
 #include <map>
 #include <iostream>
+//#include "./src/Ball.h"
+#include "Ball.h"
+#include <vector>
 
 class Camera
 {
+private:
+	bool generateBall = false;
+	unsigned int vao, buffer, objectLoc, modelMatLoc;
+
+	std::vector <Ball*> balls;
 public:
+	int cameraMode = 0;
 	glm::vec3 cameraPos, cameraTarget, cameraDirection, up, cameraRight, cameraUp, cameraFront;
 	glm::mat4 view, projMat;
-	unsigned int modelViewMatLoc, projMatLoc;
+	unsigned int viewMatLoc, projMatLoc, cameraPosLoc;
 	//Stores keys as pairs of key and state (true = pressed, false = released)
 	std::map <int, bool> specialKeys;
 	std::map <char, bool> keys;
@@ -34,13 +43,15 @@ public:
 	float yaw = 0, pitch = 0;
 
 	Camera();
-	Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far);
+	Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far, unsigned int vao, unsigned int buffer, unsigned int objectLoc, unsigned int modelMatLoc);
 	~Camera();
 
 	void update(float angle, float camX, float camZ, int deltaTime);
 
+	void mouseControl(int key, int state, int x, int y);
+
 	void passiveMotionFunc(int x, int y);
 
-	glm::mat4 getModelViewMat();
+	glm::mat4 getViewMat();
 };
 

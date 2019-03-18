@@ -6,7 +6,7 @@ Camera::Camera()
 {
 }
 
-Camera::Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far)
+Camera::Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far, unsigned int vao, unsigned int buffer, unsigned int objectLoc, unsigned int modelMatLoc)
 {
 	cameraPos = glm::vec3(0.0f, 0.0f, 10.0f);
 	cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -25,11 +25,20 @@ Camera::Camera(unsigned int programId, float cameraAngle, float width, float hei
 	///////////////////////////////////////
 
 	// Obtain modelview matrix uniform location and set value.
-	glm::mat4 modelViewMat(1.0f);
-	modelViewMatLoc = glGetUniformLocation(programId, "modelViewMat");
-	glUniformMatrix4fv(modelViewMatLoc, 1, GL_TRUE, glm::value_ptr(modelViewMat));
+	glm::mat4 viewMat(1.0f);
+	viewMatLoc = glGetUniformLocation(programId, "viewMat");
+	glUniformMatrix4fv(viewMatLoc, 1, GL_TRUE, glm::value_ptr(viewMat));
 	///////////////////////////////////////
 
+	cameraPosLoc = glGetUniformLocation(programId, "cameraPos");
+
+	this->modelMatLoc = modelMatLoc;
+	this->vao = vao;
+	this->buffer = buffer;
+	this->objectLoc = objectLoc;
+
+	//ball.LoadObject((char*)"./Models/ballBlender.obj");
+	//ball.SetupDrawing(vao, buffer, 0, 1, 2);
 }
 
 
@@ -39,35 +48,85 @@ Camera::~Camera()
 
 void Camera::update(float angle, float camX, float camZ, int deltaTime)
 {
-	//Rotates the camera view up/down/left/right based on mouse input
-	cameraFront.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
-	cameraFront.y = sin(glm::radians(pitch));
-	cameraFront.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));	
-	cameraFront = glm::normalize(cameraFront);
+	for (int i = 0; i < balls.size(); i++)
+		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, glm::vec3(0, 5, 0), deltaTime);
 
-	float deltaSpeed = speed * deltaTime;
+	if (cameraMode == 0)
+	{
+		//Rotates the camera view up/down/left/right based on mouse input
+		cameraFront.x = cos(glm::radians(pitch)) * cos(glm::radians(yaw));
+		cameraFront.y = sin(glm::radians(pitch));
+		cameraFront.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
+		cameraFront = glm::normalize(cameraFront);
 
-	if (specialKeys[GLUT_KEY_UP]) { //Adding deltaTime makes the current speed magnitude static?
-		cameraPos += deltaSpeed * cameraFront;
-		//std::cout << "Moving forward! " << std::endl;
+		float deltaSpeed = speed * deltaTime;
+
+		//Control the camera
+		if (specialKeys[GLUT_KEY_UP])
+			cameraPos += deltaSpeed * cameraFront;
+		else if (specialKeys[GLUT_KEY_DOWN])
+			cameraPos -= deltaSpeed * cameraFront;
+
+		if (specialKeys[GLUT_KEY_LEFT])
+			cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
+		else if (specialKeys[GLUT_KEY_RIGHT])
+			cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
+
+		cameraUp = glm::vec3(0, 1, 0);
+
+		//Sets the viewMatrix: vec3(pos, target, up)
+		view = glm::mat4(1.0f);
+		view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	}
-	else if (specialKeys[GLUT_KEY_DOWN]) {
-		cameraPos -= deltaSpeed * cameraFront;
+	else if (cameraMode == 1) //Over top view
+	{
+		//cameraPos = glm::vec3(0, 100, 0);
+		cameraTarget = glm::vec3(5, 0, 0);
+
+		cameraUp = glm::vec3(0, 1, 0);
+
+		//Sets the viewMatrix: vec3(pos, target, up)
+		view = glm::mat4(1.0f);
+		view = glm::lookAt(glm::vec3(0, 100, 0), cameraTarget, cameraUp);
+	}
+	else if (cameraMode == 2) //side top view
+	{
+		//cameraPos = glm::vec3(0, 100, 0);
+		cameraTarget = glm::vec3(5, 0, 0);
+
+		cameraUp = glm::vec3(0, 1, 0);
+
+		//Sets the viewMatrix: vec3(pos, target, up)
+		view = glm::mat4(1.0f);
+		view = glm::lookAt(glm::vec3(50, 70, 50), cameraTarget, cameraUp);
 	}
 
-	if (specialKeys[GLUT_KEY_LEFT]) {
-		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
-	}
 
-	if (specialKeys[GLUT_KEY_RIGHT]) {
-		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
-	}
+	//Sends the view matrix to the vertex shader
+	glUniformMatrix4fv(viewMatLoc, 1, GL_FALSE, value_ptr(view));
 
-	view = glm::mat4(1.0f);
-	//cameraPos = glm::vec3(camX, 0.0f, camZ);
-	//view = glm::rotate(view, angle, glm::vec3(0.0, 1.0, 0.0));
-	view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-	glUniformMatrix4fv(modelViewMatLoc, 1, GL_FALSE, value_ptr(view));
+	//Sends the camera's position to the fragment shader
+	glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
+
+
+}
+
+void Camera::mouseControl(int key, int state, int x, int y)
+{
+	if (key == GLUT_LEFT_BUTTON)
+	{
+		Ball *ball = new Ball(glm::vec3(5, 5, 0), cameraFront);
+		ball->LoadObject((char*)"./Models/ballBlender.obj");
+		ball->SetupDrawing(vao, buffer, 0, 1, 2);
+		
+		balls.push_back(ball);
+
+		generateBall = true;
+		std::cout << "Spawning ball!" << std::endl;
+	}
+	if (key == GLUT_RIGHT_BUTTON)
+		exit(0);
+	glutPostRedisplay();
 }
 
 void Camera::passiveMotionFunc(int x, int y)
@@ -95,7 +154,7 @@ void Camera::passiveMotionFunc(int x, int y)
 }
 
 //Getter for the model view matrix
-glm::mat4 Camera::getModelViewMat()
+glm::mat4 Camera::getViewMat()
 {
 	return view;
 }
