@@ -42,13 +42,16 @@ public:
 	float lastX = 960, lastY = 540;
 	float yaw = 0, pitch = 0;
 
+	int s = 100;
+	bool triggered = false;
+
 	Camera();
 	Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far, unsigned int vao, unsigned int buffer, unsigned int objectLoc, unsigned int modelMatLoc);
 	~Camera();
 
-	void update(float angle, float camX, float camZ, int deltaTime);
+	void update(int deltaTime, float ballAngle, float ballRotation);
 
-	void mouseControl(int key, int state, int x, int y);
+	void mouseControl(int key, int state, int x, int y, unsigned int objectLoc, unsigned int modelMatLoc, float speed, float angle, float rotation);
 
 	void passiveMotionFunc(int x, int y);
 

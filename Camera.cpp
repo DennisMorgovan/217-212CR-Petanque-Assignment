@@ -36,9 +36,6 @@ Camera::Camera(unsigned int programId, float cameraAngle, float width, float hei
 	this->vao = vao;
 	this->buffer = buffer;
 	this->objectLoc = objectLoc;
-
-	//ball.LoadObject((char*)"./Models/ballBlender.obj");
-	//ball.SetupDrawing(vao, buffer, 0, 1, 2);
 }
 
 
@@ -46,10 +43,10 @@ Camera::~Camera()
 {
 }
 
-void Camera::update(float angle, float camX, float camZ, int deltaTime)
+void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 {
 	for (int i = 0; i < balls.size(); i++)
-		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, glm::vec3(0, 5, 0), deltaTime);
+		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, deltaTime);
 
 	if (cameraMode == 0)
 	{
@@ -111,11 +108,12 @@ void Camera::update(float angle, float camX, float camZ, int deltaTime)
 
 }
 
-void Camera::mouseControl(int key, int state, int x, int y)
+void Camera::mouseControl(int key, int state, int x, int y, unsigned int objectLoc, unsigned int modelMatLoc, float speed, float angle, float rotation)
 {
-	if (key == GLUT_LEFT_BUTTON)
+	//If player presses left mouse and the time interval has passed, spawn a ball at 
+	if (key == GLUT_LEFT_BUTTON && s > 20)
 	{
-		Ball *ball = new Ball(glm::vec3(5, 5, 0), cameraFront);
+		Ball *ball = new Ball(cameraPos, cameraFront, objectLoc, modelMatLoc, speed, angle, rotation);
 		ball->LoadObject((char*)"./Models/ballBlender.obj");
 		ball->SetupDrawing(vao, buffer, 0, 1, 2);
 		
@@ -123,15 +121,30 @@ void Camera::mouseControl(int key, int state, int x, int y)
 
 		generateBall = true;
 		std::cout << "Spawning ball!" << std::endl;
+		triggered = true;
+		s = 0;
 	}
 	if (key == GLUT_RIGHT_BUTTON)
 		exit(0);
+
+
+	//Timer used to stop the player from spamming the ball spawning
+	if (triggered == true)
+	{
+		s++;
+		Sleep(20);
+		if (s > 20)
+			triggered = false;
+	}
 	glutPostRedisplay();
 }
 
 void Camera::passiveMotionFunc(int x, int y)
 {
 	//Generates mouse input and modifies the pitch/yaw
+
+	int height = glutGet(GLUT_WINDOW_HEIGHT);
+	int width = glutGet(GLUT_WINDOW_WIDTH);
 
 	float xoffset = x - lastX;
 	float yoffset = lastY - y; // reversed since y-coordinates range from bottom to top
@@ -150,7 +163,19 @@ void Camera::passiveMotionFunc(int x, int y)
 	if (pitch < -89.0f)
 		pitch = -89.0f;
 
-	//if (x != 960 || y != 540) glutWarpPointer(960, 540);
+	//Clamps the mouse inside the window to allow full 360 degree mouse rotation
+	if (x < 100 || x > width - 100)
+	{
+		lastX = width / 2;
+		lastY = height / 2;
+		glutWarpPointer(width / 2, height / 2);
+	}
+	if (y < 100 || y > height - 100)
+	{
+		lastX = width / 2;
+		lastY = height / 2;
+		glutWarpPointer(width / 2, height / 2);
+	}
 }
 
 //Getter for the model view matrix

@@ -48,24 +48,25 @@ unsigned int buffer[15];
 //VAOs and buffers from 4 to 9 are used for skybox
 unsigned int vao[15]; // Array of VAO ids.
 
-unsigned int texture[16]; // Array of VAO ids.
+unsigned int texture[25]; // Array of VAO ids.
 
-static BitMapFile *image[16]; // Local storage for bmp image data.
+static BitMapFile *image[25]; // Local storage for bmp image data.
 
 ///Setup shaders and send data to them
 unsigned int programId, vertexShaderId, fragmentShaderId, modelMatLoc, projMatLoc;
 unsigned int objectLoc, grassTexLoc, skyTexLoc, cubeTexLoc, ballTexLoc, sunTexLoc, objColorLoc;
 unsigned int skyTexLocFt, skyTexLocBk, skyTexLocLf, skyTexLocRt, skyTexLocUp, skyTexLocDn;
-unsigned int skyTexLocFtNight, alphaLoc, blinnLoc;
+unsigned int skyTexLocFtNight, skyTexLocBkNight, skyTexLocLfNight, skyTexLocRtNight, skyTexLocUpNight, alphaLoc, blinnLoc;
 unsigned int houseBaseTexLoc, houseSidesTexLoc, houseBodyTexLoc, houseRoofTexLoc, houseDoorTexLoc;
+unsigned int testLoc;
 
 //Used to calculate in-game time and fps
 int lastTime = 0, currentTime = 0, deltaTime = 1, fps;
 
 //Used for rotating the object
-float angle = 0.0f, angle1 = 0.0f;
+float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f;
+float skyboxAngle = 0.0f;
 float theta= 0, alpha = 0;
-bool isRotated = false;
 float camX = 0, camZ = 0;
 int msaa = 1, antialias = 1, blinn = 1;
 
@@ -110,19 +111,23 @@ void loadExternalTextures()
 	image[6] = getbmp("./Textures/Skybox/hourglass_lf.bmp");
 	image[7] = getbmp("./Textures/Skybox/hourglass_rt.bmp");
 	image[8] = getbmp("./Textures/Skybox/hourglass_up.bmp");
-	image[9] = getbmp("./Textures/Skybox/hourglass_dn.bmp");
+	//image[9] = getbmp("./Textures/Skybox/hourglass_dn.bmp");
 	//Skybox night
-	image[10] = getbmp("./Textures/SkyboxNight/purplenebula_ft.bmp");
+	image[9] = getbmp("./Textures/SkyboxNight/purplenebula_ft.bmp");
 
 	//House
-	image[11] = getbmp("./Textures/House/houseConcrete.bmp");
-	image[12] = getbmp("./Textures/House/houseRoof.bmp");
-	image[13] = getbmp("./Textures/House/houseStone.bmp");
-	image[14] = getbmp("./Textures/House/houseWood.bmp");
-	image[15] = getbmp("./Textures/House/houseDoor.bmp");
+	image[10] = getbmp("./Textures/House/houseConcrete.bmp");
+	image[11] = getbmp("./Textures/House/houseRoof.bmp");
+	image[12] = getbmp("./Textures/House/houseStone.bmp");
+	image[13] = getbmp("./Textures/House/houseWood.bmp");
+	image[14] = getbmp("./Textures/House/houseDoor.bmp");
+	image[15] = getbmp("./Textures/SkyboxNight/purplenebula_bk.bmp");
+	image[16] = getbmp("./Textures/SkyboxNight/purplenebula_lf.bmp");
+	image[17] = getbmp("./Textures/SkyboxNight/purplenebula_rt.bmp");
+	image[18] = getbmp("./Textures/SkyboxNight/purplenebula_up.bmp");
 
 	// Create texture ids.
-	glGenTextures(16, texture);
+	glGenTextures(25, texture);
 
 	// Bind metal cube image.
 	glActiveTexture(GL_TEXTURE0);
@@ -290,7 +295,7 @@ void loadExternalTextures()
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	houseBodyTexLoc = glGetUniformLocation(programId, "houseBodyTex");
-	glUniform1i(houseBodyTexLoc, 11);
+	glUniform1i(houseBodyTexLoc, 10);
 
 	//Roof
 	glActiveTexture(GL_TEXTURE11);
@@ -305,7 +310,7 @@ void loadExternalTextures()
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	houseRoofTexLoc = glGetUniformLocation(programId, "houseRoofTex");
-	glUniform1i(houseRoofTexLoc, 12);
+	glUniform1i(houseRoofTexLoc, 11);
 
 	//Base
 	glActiveTexture(GL_TEXTURE12);
@@ -320,7 +325,7 @@ void loadExternalTextures()
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	houseBaseTexLoc = glGetUniformLocation(programId, "houseBaseTex");
-	glUniform1i(houseBaseTexLoc, 13);
+	glUniform1i(houseBaseTexLoc, 12);
 
 	//side
 	glActiveTexture(GL_TEXTURE13);
@@ -335,7 +340,7 @@ void loadExternalTextures()
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	houseSidesTexLoc = glGetUniformLocation(programId, "houseSidesTex");
-	glUniform1i(houseSidesTexLoc, 14);
+	glUniform1i(houseSidesTexLoc, 13);
 
 	//sides & door
 	glActiveTexture(GL_TEXTURE14);
@@ -351,8 +356,69 @@ void loadExternalTextures()
 
 	houseDoorTexLoc = glGetUniformLocation(programId, "houseDoorTex");
 	glUniform1i(houseDoorTexLoc, 14);
-}
 
+	//Sky night
+	//Back
+	glActiveTexture(GL_TEXTURE15);
+	glBindTexture(GL_TEXTURE_2D, texture[15]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[15]->sizeX, image[15]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[15]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	skyTexLocBkNight = glGetUniformLocation(programId, "skyTexNightBk");
+	glUniform1i(skyTexLocBkNight, 15);
+
+	//Left
+	glActiveTexture(GL_TEXTURE16);
+	glBindTexture(GL_TEXTURE_2D, texture[16]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[16]->sizeX, image[16]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[16]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	skyTexLocLfNight = glGetUniformLocation(programId, "skyTexNightLf");
+	glUniform1i(skyTexLocLfNight, 16);
+
+	//Right
+	glActiveTexture(GL_TEXTURE17);
+	glBindTexture(GL_TEXTURE_2D, texture[17]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[17]->sizeX, image[17]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[17]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	skyTexLocRtNight = glGetUniformLocation(programId, "skyTexNightRt");
+	glUniform1i(skyTexLocRtNight, 17);
+
+	//Up
+	glActiveTexture(GL_TEXTURE18);
+	glBindTexture(GL_TEXTURE_2D, texture[18]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[18]->sizeX, image[18]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[18]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	skyTexLocUpNight = glGetUniformLocation(programId, "skyTexNightUp");
+	glUniform1i(skyTexLocUpNight, 18);
+
+}
 
 // Initialization routine.
 void setup(void)
@@ -360,7 +426,7 @@ void setup(void)
 	glClearColor(0.2, 0.5, 0.4, 0.0);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	// Create shader program executable.
 	char* vertexShader = readTextFile((char *) "vertexShader.glsl");
@@ -383,6 +449,8 @@ void setup(void)
 	glLinkProgram(programId);
 	glUseProgram(programId);
 
+	/// DEPTH MAP ///
+
 	/// MISC ///
 
 	modelMatLoc = glGetUniformLocation(programId, "modelMat");
@@ -390,6 +458,7 @@ void setup(void)
 	objColorLoc = glGetUniformLocation(programId, "objColor");
 	alphaLoc = glGetUniformLocation(programId, "alpha");
 	blinnLoc = glGetUniformLocation(programId, "blinn");
+	testLoc = glGetUniformLocation(programId, "test");
 	glUniform4f(objColorLoc, 1.0, 1.0, 1.0, 1.0);
 
 	/// Object loading ///
@@ -445,7 +514,6 @@ void setup(void)
 	/// Textures ///
 
 	loadExternalTextures();
-	//skybox.LoadTextures(programId);
 
 	/// Lighting ///
 
@@ -457,12 +525,9 @@ void drawScene(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//glm::mat4 modelViewMat(1.0f);
-	//glUniformMatrix4fv(modelViewMatLoc, 1, GL_FALSE, value_ptr(modelViewMat));
-
 	/// CAMERA ///
 
-	camera->update(angle, camX, camZ, deltaTime);
+	camera->update(deltaTime, ballAngle, ballRotation);
 
 	/// DRAWING ///
 
@@ -488,11 +553,12 @@ void drawScene(void)
 	
 	//Draw skybox;
 
+	modelMat = glm::mat4(1.0f);
+	//modelMat = glm::translate(modelMat, lighting.lightPos);
+	//modelMat = glm::scale(modelMat, glm::vec3(0.1, 0.1, 0.1));
+	modelMat = glm::rotate(modelMat, glm::radians(skyboxAngle), glm::vec3(0, 1, 0));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 	//Front
-	//glActiveTexture(GL_TEXTURE4);
-	//glBindTexture(GL_TEXTURE_2D, texture[4]);
-	//glActiveTexture(GL_TEXTURE9);
-	//glBindTexture(GL_TEXTURE_2D, texture[9]);
 	skyF.DrawObject(vao[4], objectLoc, 5);
 	//Back
 	skyB.DrawObject(vao[5], objectLoc, 6);
@@ -520,12 +586,10 @@ void drawScene(void)
 	houseSides.DrawObject(vao[13], objectLoc, 14);
 
 	//Angle corrections
-	if (angle > 360)
-		angle -= 360;
-	if (angle1 > 360)
-		angle1 -= 360;
 	if (theta > 360)
 		theta -= 360;
+	if (skyboxAngle > 360)
+		skyboxAngle -= 360;
 
 	glutSwapBuffers();
 }
@@ -539,7 +603,7 @@ void resize(int w, int h)
 void idle()
 {
 	Sleep(1000 / 60);
-	theta += 0.18;
+	theta += 0.08;
 
 	if (theta <= 90.0)
 		alpha = theta / 90.0;
@@ -561,6 +625,8 @@ void idle()
 	}
 	fps = 1000 / deltaTime;
 
+	skyboxAngle += 0.01f;
+
 	glutPostRedisplay();
 }
 
@@ -573,7 +639,7 @@ int main(int argc, char* argv[])
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 	glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);
 
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_MULTISAMPLE);
 	glutInitWindowSize(1920, 1080);
 	glutInitWindowPosition(0, 0);
 	glutCreateWindow("Modern OpenGL Petanque Game");
@@ -651,26 +717,35 @@ int main(int argc, char* argv[])
 			}
 			blinn *= -1;
 		}
-		else if (key == 'a')
+		else if (key == 'w' && ballAngle < 90.0f)
 		{
-			angle += 0.1f;
-			isRotated = true;
+			ballAngle += 5.0f;
+			std::cout << ballAngle << std::endl;
 		}
-		else if (key == 'q')
+		else if (key == 's' && ballAngle > 0.0f)
 		{
-			angle1 += 1;
-
-			camX = sin(angle1 * 3.1415 / 180.0) * 100;
+			ballAngle -= 5.0f;
+			std::cout << ballAngle << std::endl;
 		}
-		else if (key == 'e')
+		else if (key == 'd' && ballRotation < 180.0f)
 		{
-			angle1 += 1;
-
-			camZ = cos(angle1 * 3.1415 / 180.0) * 100;
+			ballRotation += 5.0f;
+			std::cout << ballRotation << std::endl;
 		}
-		else
+		else if (key == 'a' && ballRotation > 0.0f)
 		{
-			isRotated = false;
+			ballRotation -= 5.0f;
+			std::cout << ballRotation << std::endl;
+		}
+		else if (key == 'q' && ballSpeed < 20.0f)
+		{
+			ballSpeed += 1.0f;
+			std::cout << ballSpeed<< std::endl;
+		}
+		else if (key == 'e' && ballSpeed > 1.0f)
+		{
+			ballSpeed -= 1.0f;
+			std::cout << ballSpeed << std::endl;
 		}
 
 	});
@@ -693,7 +768,7 @@ int main(int argc, char* argv[])
 	});
 
 	glutMouseFunc([](int key, int state, int x, int y) {
-		camera->mouseControl(key, state, x, y);
+		camera->mouseControl(key, state, x, y, objectLoc, modelMatLoc, ballSpeed, ballAngle, ballRotation);
 	});
 
 	glewExperimental = GL_TRUE;
@@ -703,7 +778,3 @@ int main(int argc, char* argv[])
 
 	glutMainLoop();
 }
-
-
-//Create vertex structure (position and colour)
-//Currently, I hold stuff in vertex structure, but I need everything as an array of coordinates xyz xyz xyz etc
