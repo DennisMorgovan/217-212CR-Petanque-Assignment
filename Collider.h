@@ -13,6 +13,8 @@ class Collider
 protected:
 	glm::vec3 colliderCentre; ///<Centre point for the collider @note Usually the same as the gameobject it is a collider for.
 public:
+	//virtual bool collidesWithCube(CubeCollider* other) = 0; ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+	//virtual bool collidesWithSphere(SphereCollider* other) = 0;
 	virtual bool collidesWith(Collider* other) = 0; ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
 	int objectType = 0;
 	float materialBounce;

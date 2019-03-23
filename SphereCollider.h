@@ -1,5 +1,6 @@
 #pragma once
 #include "Collider.h"
+#include "CubeCollider.h"
 
 class SphereCollider : public Collider
 {
@@ -9,7 +10,12 @@ public:
 	SphereCollider(glm::vec3 centre, float radius, float materialBounce = 0);
 	~SphereCollider();
 
-	bool collidesWith(Collider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+	//bool collidesWithCube(CubeCollider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+	bool collidesWith(Collider* other) { throw "Generic collider can't be used."; }; ///Cube collider should not be used
+
+	bool collidesWith(CubeCollider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+	bool collidesWithSphere(SphereCollider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+
 
 	/* Every collider must implement the following pure virtual function or otherwise cause a compile error.*/
 	float minX(); ///<Lowest x value for the collider. Must override in inherited classes.

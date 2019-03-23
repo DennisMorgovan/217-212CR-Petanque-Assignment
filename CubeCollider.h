@@ -6,6 +6,8 @@ class CubeCollider : public Collider
 {
 public:
 	float length = 0.0, width = 0.0, height = 0.0;
+	//bool collidesWithCube(CubeCollider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
+	//bool collidesWithSphere(SphereCollider* other);
 	bool collidesWith(Collider* other); ///<pure virtual function. very collider must implement collidesWith, which calculates whethwer this collider collides with other.
 
 	/* Every collider must implement the following pure virtual function or otherwise cause a compile error.*/

@@ -41,6 +41,7 @@ Camera::Camera(unsigned int programId, float cameraAngle, float width, float hei
 
 Camera::~Camera()
 {
+	balls.clear();
 }
 
 void Camera::update(int deltaTime, float ballAngle, float ballRotation)
@@ -59,17 +60,28 @@ void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 		float deltaSpeed = speed * deltaTime;
 
 		//Control the camera
-		if (specialKeys[GLUT_KEY_UP])
+		if (specialKeys[GLUT_KEY_UP] && cameraPos.x <= 30.0f)
 			cameraPos += deltaSpeed * cameraFront;
-		else if (specialKeys[GLUT_KEY_DOWN])
+		else if (specialKeys[GLUT_KEY_DOWN] && cameraPos.x >= -10.0f)
 			cameraPos -= deltaSpeed * cameraFront;
 
-		if (specialKeys[GLUT_KEY_LEFT])
+		if (specialKeys[GLUT_KEY_LEFT] && cameraPos.z >= -15.0f)
 			cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
-		else if (specialKeys[GLUT_KEY_RIGHT])
+		else if (specialKeys[GLUT_KEY_RIGHT] && cameraPos.z <= 15.0f)
 			cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
 
 		cameraUp = glm::vec3(0, 1, 0);
+
+		//Draws the heading line
+		/*glBindVertexArray(lineVAO);
+
+
+		//glm::mat4 modelMat = glm::mat4(1.0f);
+		glm::mat4 modelMat = glm::translate(modelMat, cameraPos);
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glDrawArrays(GL_LINES, 0, 2);*/
+
+		//std::cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << std::endl;
 
 		//Sets the viewMatrix: vec3(pos, target, up)
 		view = glm::mat4(1.0f);
@@ -113,8 +125,8 @@ void Camera::mouseControl(int key, int state, int x, int y, unsigned int objectL
 	//If player presses left mouse and the time interval has passed, spawn a ball at 
 	if (key == GLUT_LEFT_BUTTON && s > 20)
 	{
-		Ball *ball = new Ball(cameraPos, cameraFront, objectLoc, modelMatLoc, speed, angle, rotation);
-		ball->LoadObject((char*)"./Models/ballBlender.obj");
+		Ball *ball = new Ball(this->cameraPos + glm::vec3(7, -4, 0), this->cameraFront, objectLoc, modelMatLoc, speed, angle, rotation, 5.0);
+		ball->LoadObject((char*)"./Models/BallScaled.obj");
 		ball->SetupDrawing(vao, buffer, 0, 1, 2);
 		
 		balls.push_back(ball);
@@ -132,7 +144,7 @@ void Camera::mouseControl(int key, int state, int x, int y, unsigned int objectL
 	if (triggered == true)
 	{
 		s++;
-		Sleep(20);
+		Sleep(10);
 		if (s > 20)
 			triggered = false;
 	}
@@ -156,7 +168,10 @@ void Camera::passiveMotionFunc(int x, int y)
 	yoffset *= sensitivity;
 
 	yaw += xoffset;
-	pitch += yoffset;
+	if (debugMode == true)
+		pitch += yoffset;
+	else
+		pitch = 0.0f;
 
 	if (pitch > 89.0f)
 		pitch = 89.0f;

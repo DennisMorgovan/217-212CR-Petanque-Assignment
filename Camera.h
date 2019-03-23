@@ -26,9 +26,10 @@ class Camera
 private:
 	bool generateBall = false;
 	unsigned int vao, buffer, objectLoc, modelMatLoc;
-
-	std::vector <Ball*> balls;
+	//unsigned int lineVAO, lineVBO;
 public:
+	std::vector <Ball*> balls;
+
 	int cameraMode = 0;
 	glm::vec3 cameraPos, cameraTarget, cameraDirection, up, cameraRight, cameraUp, cameraFront;
 	glm::mat4 view, projMat;
@@ -44,6 +45,8 @@ public:
 
 	int s = 100;
 	bool triggered = false;
+
+	bool debugMode = false;
 
 	Camera();
 	Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far, unsigned int vao, unsigned int buffer, unsigned int objectLoc, unsigned int modelMatLoc);

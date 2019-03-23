@@ -40,7 +40,7 @@ Object houseBase, houseSides, houseBody, houseRoof, houseDoor;
 Object skyF, skyB, skyLf, skyRt, skyUp, skyDn;
 Skybox skybox;
 Camera* camera;
-//Ball ball(glm::vec3(20, 0, 30), camera->cameraFront);
+
 Lighting lighting(glm::vec3(0, 10, -25));
 
 /// Holds 2 buffer objects
@@ -68,7 +68,7 @@ float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f;
 float skyboxAngle = 0.0f;
 float theta= 0, alpha = 0;
 float camX = 0, camZ = 0;
-int msaa = 1, antialias = 1, blinn = 1;
+int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1;
 
 //Tests whether the shaders have compiled successfully or not
 void shaderCompileTest(GLuint shader)
@@ -506,6 +506,7 @@ void setup(void)
 	houseDoor.SetupDrawing(vao[11], buffer[11], 0, 1, 2);
 	houseRoof.SetupDrawing(vao[12], buffer[12], 0, 1, 2);
 	houseSides.SetupDrawing(vao[13], buffer[13], 0, 1, 2);
+	//Setup for the camera heading line
 
 	/// Camera ///
 
@@ -524,7 +525,6 @@ void setup(void)
 void drawScene(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	/// CAMERA ///
 
 	camera->update(deltaTime, ballAngle, ballRotation);
@@ -550,7 +550,6 @@ void drawScene(void)
 	glUniform3f(objColorLoc, 0.0, 0.5, 0.0);
 	grassfield.DrawObject(vao[1], objectLoc, 0, modelMatLoc, glm::vec3(0, -5, 0));
 
-	
 	//Draw skybox;
 
 	modelMat = glm::mat4(1.0f);
@@ -626,6 +625,28 @@ void idle()
 	fps = 1000 / deltaTime;
 
 	skyboxAngle += 0.01f;
+
+	for (std::vector<Object>::size_type i = 0; i != camera->balls.size(); i++) {
+		for (std::vector<Object>::size_type j = i + 1; j != camera->balls.size(); j++) {
+			if (camera->balls[i]->collider != NULL) {
+				SphereCollider *col1 = (SphereCollider*)camera->balls[i]->collider;
+				SphereCollider *col2 = (SphereCollider*)camera->balls[j]->collider;
+
+				if (col1->collidesWithSphere(col2))//If it collides
+				{
+					camera->balls[i]->collides(camera->balls[j], 1);
+					
+					//Collision resolution
+					/*if (cubeColliderVector[i]->objectType == 1 && cubeColliderVector[j]->objectType == 2) //If collision between hovercraft & obstacle
+					{
+						hovercraft.collides(cubeColliderVector[j], cubeColliderVector[j]->materialBounce);
+						std::cout << "Collides with obstacle!" << std::endl;
+					}*/
+				}
+
+			}
+		}
+	}
 
 	glutPostRedisplay();
 }
@@ -717,6 +738,14 @@ int main(int argc, char* argv[])
 			}
 			blinn *= -1;
 		}
+		else if (key == 'v')
+		{
+			if(wireframe == 1)
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			else
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			wireframe *= -1;
+		}
 		else if (key == 'w' && ballAngle < 90.0f)
 		{
 			ballAngle += 5.0f;
@@ -730,12 +759,12 @@ int main(int argc, char* argv[])
 		else if (key == 'd' && ballRotation < 180.0f)
 		{
 			ballRotation += 5.0f;
-			std::cout << ballRotation << std::endl;
+			std::cout << "Ball rotation: " << ballRotation << std::endl;
 		}
 		else if (key == 'a' && ballRotation > 0.0f)
 		{
 			ballRotation -= 5.0f;
-			std::cout << ballRotation << std::endl;
+			std::cout << "Ball rotation: " << ballRotation << std::endl;
 		}
 		else if (key == 'q' && ballSpeed < 20.0f)
 		{
@@ -746,6 +775,18 @@ int main(int argc, char* argv[])
 		{
 			ballSpeed -= 1.0f;
 			std::cout << ballSpeed << std::endl;
+		}
+		else if (key == 'p') //Enable debug mode
+		{
+			if (debug == 1)
+			{
+				camera->debugMode = true;
+			}
+			else
+			{
+				camera->debugMode = false;
+			}
+			debug *= -1;
 		}
 
 	});
