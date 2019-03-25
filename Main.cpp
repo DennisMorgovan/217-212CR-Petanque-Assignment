@@ -24,9 +24,12 @@
 #include "./src/getbmp.h"
 #include "./src/Ball.h"
 #include "./src/Lighting.h"
+#include "./src/CubeCollider.h"
+#include "./src/shader.h"
 
 
 using namespace std;
+float col1Posx = 60, col1Posz = 10; //x - send object back(+) or front(-); z - send object left(+) or right(-)
 
 static enum object { FIELD, SKY, CUBE }; // VAO ids.
 static enum buffer { FIELD_VERTICES, SKY_VERTICES }; // VBO ids.
@@ -35,29 +38,37 @@ glm::mat4 modelMat(1.0f);
 glm::mat4 viewMat(1.0f);
 glm::mat4 projMat(1.0f);
 
-Object testCube, grassfield, sun;
+Object testCube, grassfield, sun, heading;
 Object houseBase, houseSides, houseBody, houseRoof, houseDoor;
+Object fenceBody, fenceSides;
+Object treeTop, treeTrunk;
 Object skyF, skyB, skyLf, skyRt, skyUp, skyDn;
 Skybox skybox;
 Camera* camera;
 
 Lighting lighting(glm::vec3(0, 10, -25));
 
+//CubeCollider* cubeCol1 = new CubeCollider(glm::vec3(col1Posx, 0, col1Posz), 5.0f, 5.0f, 5.0f, 0);
+
 /// Holds 2 buffer objects
-unsigned int buffer[15];
+unsigned int buffer[20];
 //VAOs and buffers from 4 to 9 are used for skybox
-unsigned int vao[15]; // Array of VAO ids.
+unsigned int vao[20]; // Array of VAO ids.
 
 unsigned int texture[25]; // Array of VAO ids.
 
 static BitMapFile *image[25]; // Local storage for bmp image data.
+static BitMapFile *normalMaps[25]; // Local storage for bmp normal maps data.
 
 ///Setup shaders and send data to them
-unsigned int programId, vertexShaderId, fragmentShaderId, modelMatLoc, projMatLoc;
+unsigned int programId, programToonId, vertexShaderId, fragmentShaderId, vertexShaderToonId, fragmentShaderToonId, modelMatLoc, projMatLoc, tempId;
 unsigned int objectLoc, grassTexLoc, skyTexLoc, cubeTexLoc, ballTexLoc, sunTexLoc, objColorLoc;
 unsigned int skyTexLocFt, skyTexLocBk, skyTexLocLf, skyTexLocRt, skyTexLocUp, skyTexLocDn;
 unsigned int skyTexLocFtNight, skyTexLocBkNight, skyTexLocLfNight, skyTexLocRtNight, skyTexLocUpNight, alphaLoc, blinnLoc;
 unsigned int houseBaseTexLoc, houseSidesTexLoc, houseBodyTexLoc, houseRoofTexLoc, houseDoorTexLoc;
+unsigned int fenceBodyTexLoc, fenceSidesTexLoc;
+unsigned int treeTrunkTexLoc, treeTopTexLoc;
+unsigned int fenceBodyNormalMapLoc;
 unsigned int testLoc;
 
 //Used to calculate in-game time and fps
@@ -68,35 +79,7 @@ float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f;
 float skyboxAngle = 0.0f;
 float theta= 0, alpha = 0;
 float camX = 0, camZ = 0;
-int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1;
-
-//Tests whether the shaders have compiled successfully or not
-void shaderCompileTest(GLuint shader)
-{
-	GLint result = GL_FALSE;
-	int logLength; glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
-	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
-	std::vector<GLchar> vertShaderError((logLength > 1) ? logLength : 1);
-	glGetShaderInfoLog(shader, logLength, NULL, &vertShaderError[0]);
-	std::cout << &vertShaderError[0] << std::endl;
-}
-
-//Function to read text file.
-char* readTextFile(char* aTextFile)
-{
-	FILE* filePointer = fopen(aTextFile, "rb");
-	char* content = NULL;
-	long numVal = 0;
-
-	fseek(filePointer, 0L, SEEK_END);
-	numVal = ftell(filePointer);
-	fseek(filePointer, 0L, SEEK_SET);
-	content = (char*)malloc((numVal + 1) * sizeof(char));
-	fread(content, 1, numVal, filePointer);
-	content[numVal] = '\0';
-	fclose(filePointer);
-	return content;
-}
+int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1, toon = -1;
 
 void loadExternalTextures()
 {
@@ -125,6 +108,12 @@ void loadExternalTextures()
 	image[16] = getbmp("./Textures/SkyboxNight/purplenebula_lf.bmp");
 	image[17] = getbmp("./Textures/SkyboxNight/purplenebula_rt.bmp");
 	image[18] = getbmp("./Textures/SkyboxNight/purplenebula_up.bmp");
+
+	//Fence
+	image[19] = getbmp("./Textures/Fence/fenceMetal.bmp");
+	image[20] = getbmp("./Textures/Fence/fenceWood3.bmp");
+	image[21] = getbmp("./Textures/Tree/treeTrunk.bmp");
+	image[22] = getbmp("./Textures/Tree/treeTop.bmp");
 
 	// Create texture ids.
 	glGenTextures(25, texture);
@@ -418,6 +407,86 @@ void loadExternalTextures()
 	skyTexLocUpNight = glGetUniformLocation(programId, "skyTexNightUp");
 	glUniform1i(skyTexLocUpNight, 18);
 
+	//Fence
+
+	//Fence sides
+	glActiveTexture(GL_TEXTURE19);
+	glBindTexture(GL_TEXTURE_2D, texture[19]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[19]->sizeX, image[19]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[19]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	fenceSidesTexLoc = glGetUniformLocation(programId, "fenceSidesTex");
+	glUniform1i(fenceSidesTexLoc, 19);
+
+	//Fence Body
+	glActiveTexture(GL_TEXTURE20);
+	glBindTexture(GL_TEXTURE_2D, texture[20]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[20]->sizeX, image[20]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[20]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	fenceBodyTexLoc = glGetUniformLocation(programId, "fenceBodyTex");
+	glUniform1i(fenceBodyTexLoc, 20);
+
+	//Tree trunk
+	glActiveTexture(GL_TEXTURE21);
+	glBindTexture(GL_TEXTURE_2D, texture[21]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[21]->sizeX, image[21]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[21]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	treeTrunkTexLoc = glGetUniformLocation(programId, "treeTrunkTex");
+	glUniform1i(treeTrunkTexLoc, 21);
+
+	//Tree top
+	glActiveTexture(GL_TEXTURE22);
+	glBindTexture(GL_TEXTURE_2D, texture[22]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[22]->sizeX, image[22]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[22]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	treeTopTexLoc = glGetUniformLocation(programId, "treeTopTex");
+	glUniform1i(treeTopTexLoc, 22);
+}
+
+void loadNormalMaps()
+{
+	normalMaps[0] = getbmp("./Textures/Fence/fenceWoodNormalMap.bmp");
+
+	glActiveTexture(GL_TEXTURE23);
+	glBindTexture(GL_TEXTURE_2D, texture[23]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, normalMaps[0]->sizeX, normalMaps[0]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, normalMaps[0]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	fenceBodyNormalMapLoc = glGetUniformLocation(programId, "fenceBodyNormalMap");
+	glUniform1i(fenceBodyNormalMapLoc, 23);
 }
 
 // Initialization routine.
@@ -429,25 +498,32 @@ void setup(void)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	// Create shader program executable.
-	char* vertexShader = readTextFile((char *) "vertexShader.glsl");
-	vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShaderId, 1, (const char**)&vertexShader, NULL);
-	glCompileShader(vertexShaderId);
+	vertexShaderId = setShader((char*)"vertex", (char*)"vertexShader.glsl");
 	std::cout << "::: VERTEX SHADER :::" << std::endl;
 	shaderCompileTest(vertexShaderId);
 
-	char* fragmentShader = readTextFile((char *) "fragmentShader.glsl");
-	fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShaderId, 1, (const char**)&fragmentShader, NULL);
-	glCompileShader(fragmentShaderId);
+	fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShader.glsl");
 	std::cout << "::: FRAGMENT SHADER :::" << std::endl;
 	shaderCompileTest(fragmentShaderId);
+
+	vertexShaderToonId = setShader((char*)"vertex", (char*)"vertexShaderToon.glsl");
+	std::cout << "::: TOON VERTEX SHADER :::" << std::endl;
+	shaderCompileTest(vertexShaderToonId);
+
+	fragmentShaderToonId = setShader((char*)"fragment", (char*)"fragmentShaderToon.glsl");
+	std::cout << "::: TOON FRAGMENT SHADER :::" << std::endl;
+	shaderCompileTest(fragmentShaderToonId);
 
 	programId = glCreateProgram();
 	glAttachShader(programId, vertexShaderId);
 	glAttachShader(programId, fragmentShaderId);
 	glLinkProgram(programId);
 	glUseProgram(programId);
+
+	programToonId = glCreateProgram();
+	glAttachShader(programToonId, vertexShaderToonId);
+	glAttachShader(programToonId, fragmentShaderToonId);
+	glLinkProgram(programToonId);
 
 	/// DEPTH MAP ///
 
@@ -477,13 +553,18 @@ void setup(void)
 	houseDoor.LoadObject((char*)"./Models/House/houseDoor.obj");
 	houseRoof.LoadObject((char*)"./Models/House/houseRoof.obj");
 	houseSides.LoadObject((char*)"./Models/House/houseSides.obj");
+	fenceBody.LoadObject((char*)"./Models/Fence/fenceTest1.obj");
+	fenceSides.LoadObject((char*)"./Models/Fence/fenceTest2.obj");
+	heading.LoadObject((char*)"./Models/line.obj");
+	treeTrunk.LoadObject((char*)"./Models/Tree/treeTrunk.obj");
+	treeTop.LoadObject((char*)"./Models/Tree/treeTop.obj");
 
 	/// Binding stuff ///
 
 	//Generating the VBO's and VAO's
-	glGenVertexArrays(15, vao);
+	glGenVertexArrays(20, vao);
 	//glGenVertexArrays(1, &sunVAO);
-	glGenBuffers(15, buffer);
+	glGenBuffers(20, buffer);
 
 	//Binding test cube
 	testCube.SetupDrawing(vao[0], buffer[0], 0, 1, 2);
@@ -506,8 +587,15 @@ void setup(void)
 	houseDoor.SetupDrawing(vao[11], buffer[11], 0, 1, 2);
 	houseRoof.SetupDrawing(vao[12], buffer[12], 0, 1, 2);
 	houseSides.SetupDrawing(vao[13], buffer[13], 0, 1, 2);
-	//Setup for the camera heading line
 
+	//Fence
+	fenceSides.SetupDrawing(vao[14], buffer[14], 0, 1, 2);
+	fenceBody.SetupDrawing(vao[15], buffer[15], 0, 1, 2);
+	//Setup for the camera heading line
+	heading.SetupDrawing(vao[16], buffer[16], 0, 1, 2);
+	//Tree
+	treeTrunk.SetupDrawing(vao[17], buffer[17], 0, 1, 2);
+	treeTop.SetupDrawing(vao[18], buffer[18], 0, 1, 2);
 	/// Camera ///
 
 	camera = new Camera(programId, 40.0f, 1920, 1080, 1.0f, 100.0f, vao[3], buffer[3], objectLoc, modelMatLoc);
@@ -515,6 +603,7 @@ void setup(void)
 	/// Textures ///
 
 	loadExternalTextures();
+	loadNormalMaps();
 
 	/// Lighting ///
 
@@ -544,7 +633,7 @@ void drawScene(void)
 
 	//testcube
 	glUniform3f(objColorLoc, 0.5, 0.7, 1.0);
-	testCube.DrawObject(vao[0], objectLoc, 2, modelMatLoc, glm::vec3(0, 10, 0));
+	testCube.DrawObject(vao[0], objectLoc, 2, modelMatLoc, glm::vec3(col1Posx, 0, col1Posz));
 	
 	//Grassfield
 	glUniform3f(objColorLoc, 0.0, 0.5, 0.0);
@@ -576,6 +665,7 @@ void drawScene(void)
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::rotate(modelMat, glm::radians(180.0f), glm::vec3(0, 1, 0));
 	modelMat = glm::translate(modelMat, glm::vec3(-45, -5, 30));
+	modelMat = glm::scale(modelMat, glm::vec3(1.5, 1.5, 1.5));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
 	houseBase.DrawObject(vao[9], objectLoc, 10);
@@ -583,6 +673,34 @@ void drawScene(void)
 	houseDoor.DrawObject(vao[11], objectLoc, 12);
 	houseRoof.DrawObject(vao[12], objectLoc, 13);
 	houseSides.DrawObject(vao[13], objectLoc, 14);
+
+	//Fence
+	modelMat = glm::mat4(1.0f);
+	modelMat = glm::translate(modelMat, glm::vec3(-20, -4.7, 30));
+	modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+
+	fenceSides.DrawObject(vao[14], objectLoc, 15);
+	fenceBody.DrawObject(vao[15], objectLoc, 16);
+
+	//Heading
+	modelMat = glm::mat4(1.0f);
+	modelMat = glm::rotate(modelMat, glm::radians(-camera->yaw), glm::vec3(0, 1, 0));
+	modelMat = glm::translate(modelMat,camera->cameraPos + glm::vec3(0, -5, 0));
+	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+
+	heading.DrawObject(vao[16], objectLoc, 17);
+
+	//Tree
+	modelMat = glm::mat4(1.0f);
+	modelMat = glm::translate(modelMat, glm::vec3(10, -5, 40));
+	modelMat = glm::scale(modelMat, glm::vec3(2.5, 2.5, 2.5));
+	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+
+	treeTrunk.DrawObject(vao[17], objectLoc, 18);
+	treeTop.DrawObject(vao[18], objectLoc, 19);
 
 	//Angle corrections
 	if (theta > 360)
@@ -635,16 +753,13 @@ void idle()
 				if (col1->collidesWithSphere(col2))//If it collides
 				{
 					camera->balls[i]->collides(camera->balls[j], 1);
-					
-					//Collision resolution
-					/*if (cubeColliderVector[i]->objectType == 1 && cubeColliderVector[j]->objectType == 2) //If collision between hovercraft & obstacle
-					{
-						hovercraft.collides(cubeColliderVector[j], cubeColliderVector[j]->materialBounce);
-						std::cout << "Collides with obstacle!" << std::endl;
-					}*/
 				}
 
-			}
+				//if (col1->collidesWith(cubeCol1))
+				//	camera->balls[i]->collidesWall(cubeCol1);
+				//if (col2->collidesWith(cubeCol1))
+				//	camera->balls[j]->collidesWall(cubeCol1);
+			}		
 		}
 	}
 
@@ -788,6 +903,30 @@ int main(int argc, char* argv[])
 			}
 			debug *= -1;
 		}
+		else if (key == 'b')
+		{
+			if (toon == 1)
+			{
+				//glAttachShader(programId, vertexShaderToonId);
+				//glAttachShader(programId, fragmentShaderToonId);
+				tempId = programId;
+				programId = programToonId;
+				programToonId = tempId;
+				glUseProgram(programId);
+				std::cout << "Toon shader!" << std::endl;
+			}
+			else
+			{
+				//glAttachShader(programId, vertexShaderId);
+				//glAttachShader(programId, fragmentShaderId);
+				tempId = programToonId;
+				programToonId = programId;
+				programId = tempId;
+				glUseProgram(programId);
+				std::cout << "Normal shader!" << std::endl;
+			}
+			toon *= -1;
+		}
 
 	});
 
@@ -819,3 +958,11 @@ int main(int argc, char* argv[])
 
 	glutMainLoop();
 }
+
+//Questions: switch between shaders
+//Fix heading
+//Instance trees
+//Fix normal mapping
+//Fix ball wall collision
+//Fix curved shot angle
+//Take look at physics code

@@ -15,7 +15,7 @@
 #include<vector>
 #include<iostream>
 
-#define MAXVERT 50000
+#define MAXVERT 100000
 
 struct Vertex
 {

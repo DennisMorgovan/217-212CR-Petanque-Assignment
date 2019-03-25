@@ -37,7 +37,7 @@ public:
 	void update(int deltaTime, unsigned int programId, unsigned int modelMatLoc);
 	float magnitude(glm::vec3 a);
 	void collides(Ball* otherBall, float materialBounce = 1.0f); ///<Virtual function to notify this game object that a collision has happened can be overridden (optional).
-	void collidesRacetrack(Collider* other);
+	void collidesWall(CubeCollider* other);
 
 	void SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex, int locationNormals);
 	void DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime);

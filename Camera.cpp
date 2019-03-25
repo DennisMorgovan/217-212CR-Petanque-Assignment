@@ -65,9 +65,9 @@ void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 		else if (specialKeys[GLUT_KEY_DOWN] && cameraPos.x >= -10.0f)
 			cameraPos -= deltaSpeed * cameraFront;
 
-		if (specialKeys[GLUT_KEY_LEFT] && cameraPos.z >= -15.0f)
+		if (specialKeys[GLUT_KEY_LEFT] && cameraPos.z >= -10.0f)
 			cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
-		else if (specialKeys[GLUT_KEY_RIGHT] && cameraPos.z <= 15.0f)
+		else if (specialKeys[GLUT_KEY_RIGHT] && cameraPos.z <= 25.0f)
 			cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
 
 		cameraUp = glm::vec3(0, 1, 0);

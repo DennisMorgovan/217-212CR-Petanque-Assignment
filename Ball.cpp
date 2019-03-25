@@ -47,28 +47,6 @@ float Ball::magnitude(glm::vec3 a)
 
 void Ball::collides(Ball* otherBall, float materialBounce)
 {
-	//Calculates base vector and normalizes it
-	/*glm::vec3 delta = this->position - otherBall->position;
-	delta = glm::normalize(delta);
-
-	//First ball
-	glm::vec3 velocity1 = this->velocity;
-	float x1 = glm::dot(delta, velocity1);
-	glm::vec3 velocity1x = delta * x1; // x direction veolocity vector
-	glm::vec3 velocity1y = velocity1 - velocity1x; // perpendicular y vector
-	float m1 = this->mass;
-
-
-	delta *= -1;
-	//Second ball
-	glm::vec3 velocity2 = otherBall->velocity;
-	float x2 = glm::dot(delta, velocity2);
-	glm::vec3 velocity2x = delta * x2; // x direction veolocity vector
-	glm::vec3 velocity2y = velocity2 - velocity2x; // perpendicular y vector
-	float m2 = this->mass;
-
-	//this->velocity = velocity1x * (m1 - m2) / (m1 + m2) + velocity2x * (2 * m2) / (m1 + m2) + velocity1y;
-	//otherBall->velocity = velocity1x * (2 * m1) / (m1 + m2) + velocity2x * (m2 - m1) / (m1 + m2) + velocity2y;*/
 	glm::vec3 velocity1, velocity2;
 
 	glm::vec3 collisionNormal = glm::normalize(this->position - otherBall->position); //Obtaining the normal of the collision plane (vector connecting two collision points)
@@ -87,13 +65,25 @@ void Ball::collides(Ball* otherBall, float materialBounce)
 	velocity1Parallel = velocity1ParallelNew;
 	velocity2Parallel = velocity2ParallelNew;
 
-	this->velocity = velocity1Parallel + velocity1Ortho;
-	otherBall->velocity = velocity2Parallel + velocity2Ortho;
+		this->velocity = velocity1Parallel + velocity1Ortho;
+		otherBall->velocity = velocity2Parallel + velocity2Ortho;
 	//std::cout << "Collision!" << std::endl;
 }
 
-void Ball::collidesRacetrack(Collider * other)
+void Ball::collidesWall(CubeCollider* other)
 {
+	glm::vec3 velocity1;
+
+	glm::vec3 collisionNormal = glm::normalize(this->position - other->GetCenter()); //Obtaining the normal of the collision plane (vector connecting two collision points)
+	glm::vec3 collisionDirection(-collisionNormal.y, collisionNormal.x, 0.0f); //Direction of the normal
+
+	glm::vec3 velocity1Parallel = glm::dot(collisionNormal, this->velocity) * collisionNormal;
+	glm::vec3 velocity1Ortho = glm::dot(collisionDirection, this->velocity) * collisionDirection;
+
+	glm::vec3 velocity1ParallelNew = (velocity1Parallel * (this->mass - 10.0f)) / (this->mass + 10.0f);
+	velocity1Parallel = velocity1ParallelNew;
+	this->velocity = velocity1Parallel + velocity1Ortho;
+	std::cout << "Collision!" << std::endl;
 }
 
 void Ball::SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex, int locationNormals)
