@@ -64,5 +64,6 @@ public:
 	void SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex, int locationNormals);
 	void DrawObject(unsigned int vao,  unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, glm::vec3 position);
 	void DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj);
+	void DrawObjectInstance(unsigned int vao, unsigned int objectLoc, unsigned int obj, int instanceNumber);
 };
 

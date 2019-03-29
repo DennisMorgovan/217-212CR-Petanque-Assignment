@@ -1,6 +1,7 @@
 //STD includes
 #include <iostream>
 #include <fstream>
+#include <map>
 
 //OpenGL includes
 #ifdef __APPLE__
@@ -26,9 +27,23 @@
 #include "./src/Lighting.h"
 #include "./src/CubeCollider.h"
 #include "./src/shader.h"
-
+#include <ft2build.h>
+#pragma comment(lib, "freetype.lib")
+#include FT_FREETYPE_H  
 
 using namespace std;
+FT_Library ft; //FreeType library
+FT_Face face; //Type
+
+struct Character {
+	GLuint     TextureID;  // ID handle of the glyph texture
+	glm::ivec2 Size;       // Size of glyph
+	glm::ivec2 Bearing;    // Offset from baseline to left/top of glyph
+	GLuint     Advance;    // Offset to advance to next glyph
+};
+std::map<GLchar, Character> Characters;
+
+glm::vec2 offsets[10];
 float col1Posx = 60, col1Posz = 10; //x - send object back(+) or front(-); z - send object left(+) or right(-)
 
 static enum object { FIELD, SKY, CUBE }; // VAO ids.
@@ -43,43 +58,48 @@ Object houseBase, houseSides, houseBody, houseRoof, houseDoor;
 Object fenceBody, fenceSides;
 Object treeTop, treeTrunk;
 Object skyF, skyB, skyLf, skyRt, skyUp, skyDn;
+Object balloon, basket, basketMain;
+Object buns, cheese, meat, seeds, tomato;
 Skybox skybox;
 Camera* camera;
 
 Lighting lighting(glm::vec3(0, 10, -25));
 
-//CubeCollider* cubeCol1 = new CubeCollider(glm::vec3(col1Posx, 0, col1Posz), 5.0f, 5.0f, 5.0f, 0);
+//CubeCollider* cubeCol1 = new CubeCollider(glm::vec3(col1Posx, 0, col1Posz), 1.0f, 1.0f, 1.0f, 0);
 
 /// Holds 2 buffer objects
-unsigned int buffer[20];
+unsigned int buffer[30];
 //VAOs and buffers from 4 to 9 are used for skybox
-unsigned int vao[20]; // Array of VAO ids.
+unsigned int vao[30]; // Array of VAO ids.
 
-unsigned int texture[25]; // Array of VAO ids.
+unsigned int texture[35]; // Array of VAO ids.
 
-static BitMapFile *image[25]; // Local storage for bmp image data.
-static BitMapFile *normalMaps[25]; // Local storage for bmp normal maps data.
+static BitMapFile *image[35]; // Local storage for bmp image data.
+static BitMapFile *normalMaps[30]; // Local storage for bmp normal maps data.
 
 ///Setup shaders and send data to them
-unsigned int programId, programToonId, vertexShaderId, fragmentShaderId, vertexShaderToonId, fragmentShaderToonId, modelMatLoc, projMatLoc, tempId;
+unsigned int programId, programToonId, vertexShaderId, fragmentShaderId, vertexShaderToonId, fragmentShaderToonId, modelMatLoc, tempId;
+unsigned int modelMatToonLoc, temp;
 unsigned int objectLoc, grassTexLoc, skyTexLoc, cubeTexLoc, ballTexLoc, sunTexLoc, objColorLoc;
 unsigned int skyTexLocFt, skyTexLocBk, skyTexLocLf, skyTexLocRt, skyTexLocUp, skyTexLocDn;
-unsigned int skyTexLocFtNight, skyTexLocBkNight, skyTexLocLfNight, skyTexLocRtNight, skyTexLocUpNight, alphaLoc, blinnLoc;
+unsigned int skyTexLocFtNight, skyTexLocBkNight, skyTexLocLfNight, skyTexLocRtNight, skyTexLocUpNight, alphaLoc, blinnLoc, fogLoc, offsetLoc, offsetArrayLoc, normalMappingLoc;
 unsigned int houseBaseTexLoc, houseSidesTexLoc, houseBodyTexLoc, houseRoofTexLoc, houseDoorTexLoc;
 unsigned int fenceBodyTexLoc, fenceSidesTexLoc;
 unsigned int treeTrunkTexLoc, treeTopTexLoc;
 unsigned int fenceBodyNormalMapLoc;
 unsigned int testLoc;
+unsigned int balloonLoc, basketLoc, basketMainLoc;
+unsigned int bunsLoc, meatLoc, cheeseLoc, tomatoLoc, seedsLoc;
 
 //Used to calculate in-game time and fps
 int lastTime = 0, currentTime = 0, deltaTime = 1, fps;
 
 //Used for rotating the object
-float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f;
+float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f, balloonZ = 40.0f, balloonY = 13.0f, off = 0.08f;
 float skyboxAngle = 0.0f;
 float theta= 0, alpha = 0;
 float camX = 0, camZ = 0;
-int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1, toon = -1;
+int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1, toon = 0, fog = 1, normalMapping = -1;
 
 void loadExternalTextures()
 {
@@ -115,8 +135,20 @@ void loadExternalTextures()
 	image[21] = getbmp("./Textures/Tree/treeTrunk.bmp");
 	image[22] = getbmp("./Textures/Tree/treeTop.bmp");
 
+	//Balloon
+	image[23] = getbmp("./Textures/Balloon/balloon.bmp");
+	image[24] = getbmp("./Textures/Balloon/basket.bmp");
+	image[25] = getbmp("./Textures/Balloon/basketMain.bmp");
+
+	//Burger
+	image[26] = getbmp("./Textures/Burger/bun.bmp");
+	image[27] = getbmp("./Textures/Burger/meat.bmp");
+	image[28] = getbmp("./Textures/Burger/cheese.bmp");
+	image[29] = getbmp("./Textures/Burger/tomato.bmp");
+	image[30] = getbmp("./Textures/Burger/grain.bmp");
+
 	// Create texture ids.
-	glGenTextures(25, texture);
+	glGenTextures(35, texture);
 
 	// Bind metal cube image.
 	glActiveTexture(GL_TEXTURE0);
@@ -468,6 +500,130 @@ void loadExternalTextures()
 
 	treeTopTexLoc = glGetUniformLocation(programId, "treeTopTex");
 	glUniform1i(treeTopTexLoc, 22);
+
+	//Balloon
+	glActiveTexture(GL_TEXTURE24);
+	glBindTexture(GL_TEXTURE_2D, texture[24]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[23]->sizeX, image[23]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[23]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	balloonLoc = glGetUniformLocation(programId, "balloonTex");
+	glUniform1i(balloonLoc, 24);
+
+	//Basket
+	glActiveTexture(GL_TEXTURE25);
+	glBindTexture(GL_TEXTURE_2D, texture[25]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[24]->sizeX, image[24]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[24]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	basketLoc = glGetUniformLocation(programId, "basketSideTex");
+	glUniform1i(basketLoc, 25);
+
+	//Basket main
+	glActiveTexture(GL_TEXTURE26);
+	glBindTexture(GL_TEXTURE_2D, texture[26]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[25]->sizeX, image[25]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[25]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	basketMainLoc = glGetUniformLocation(programId, "basketTex");
+	glUniform1i(basketMainLoc, 26);
+
+	//Buns
+	glActiveTexture(GL_TEXTURE27);
+	glBindTexture(GL_TEXTURE_2D, texture[27]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[26]->sizeX, image[26]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[26]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	bunsLoc = glGetUniformLocation(programId, "bunTex");
+	glUniform1i(bunsLoc, 27);
+
+
+	//Meat
+	glActiveTexture(GL_TEXTURE28);
+	glBindTexture(GL_TEXTURE_2D, texture[28]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[27]->sizeX, image[27]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[27]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	meatLoc = glGetUniformLocation(programId, "meatTex");
+	glUniform1i(meatLoc, 28);
+
+
+	//Cheese
+	glActiveTexture(GL_TEXTURE29);
+	glBindTexture(GL_TEXTURE_2D, texture[29]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[28]->sizeX, image[28]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[28]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	cheeseLoc = glGetUniformLocation(programId, "cheeseTex");
+	glUniform1i(cheeseLoc, 29);
+
+
+	//Tomato
+	glActiveTexture(GL_TEXTURE30);
+	glBindTexture(GL_TEXTURE_2D, texture[30]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[29]->sizeX, image[29]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[29]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	tomatoLoc = glGetUniformLocation(programId, "tomatoTex");
+	glUniform1i(tomatoLoc, 30);
+
+
+	//Seeds
+	glActiveTexture(GL_TEXTURE31);
+	glBindTexture(GL_TEXTURE_2D, texture[31]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image[30]->sizeX, image[30]->sizeY, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, image[30]->data);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	seedsLoc = glGetUniformLocation(programId, "seedsTex");
+	glUniform1i(seedsLoc, 31);
 }
 
 void loadNormalMaps()
@@ -489,6 +645,61 @@ void loadNormalMaps()
 	glUniform1i(fenceBodyNormalMapLoc, 23);
 }
 
+void setupFreeFont()
+{
+	//Checking for freetype errors
+	if (FT_Init_FreeType(&ft))
+		std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
+
+	if (FT_New_Face(ft, "./fonts/ARIAL.ttf", 0, &face))
+		std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
+
+	FT_Set_Pixel_Sizes(face, 0, 48); //Defines font size
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // Disable byte-alignment restriction
+
+	for (GLubyte c = 0; c < 128; c++)
+	{
+		// Load character glyph 
+		if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+		{
+			std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
+			continue;
+		}
+		// Generate texture
+		GLuint texture;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RED,
+			face->glyph->bitmap.width,
+			face->glyph->bitmap.rows,
+			0,
+			GL_RED,
+			GL_UNSIGNED_BYTE,
+			face->glyph->bitmap.buffer
+		);
+		// Set texture options
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Now store character for later use
+		Character character = {
+			texture,
+			glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+			glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+			face->glyph->advance.x
+		};
+		Characters.insert(std::pair<GLchar, Character>(c, character));
+	}
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	FT_Done_Face(face);
+	FT_Done_FreeType(ft);
+}
+
 // Initialization routine.
 void setup(void)
 {
@@ -497,22 +708,47 @@ void setup(void)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	// Create shader program executable.
-	vertexShaderId = setShader((char*)"vertex", (char*)"vertexShader.glsl");
-	std::cout << "::: VERTEX SHADER :::" << std::endl;
-	shaderCompileTest(vertexShaderId);
+	if (toon == 0)
+	{
+		// Create shader program executable.
+		vertexShaderId = setShader((char*)"vertex", (char*)"vertexShader.glsl");
+		std::cout << "::: VERTEX SHADER :::" << std::endl;
+		shaderCompileTest(vertexShaderId);
 
-	fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShader.glsl");
-	std::cout << "::: FRAGMENT SHADER :::" << std::endl;
-	shaderCompileTest(fragmentShaderId);
+		fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShader.glsl");
+		std::cout << "::: FRAGMENT SHADER :::" << std::endl;
+		shaderCompileTest(fragmentShaderId);
+	}
+	else if (toon == 1)
+	{
+		vertexShaderId = setShader((char*)"vertex", (char*)"vertexShaderToon.glsl");
+		std::cout << "::: TOON VERTEX SHADER :::" << std::endl;
+		shaderCompileTest(vertexShaderId);
 
-	vertexShaderToonId = setShader((char*)"vertex", (char*)"vertexShaderToon.glsl");
-	std::cout << "::: TOON VERTEX SHADER :::" << std::endl;
-	shaderCompileTest(vertexShaderToonId);
+		fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShaderToon.glsl");
+		std::cout << "::: TOON FRAGMENT SHADER :::" << std::endl;
+		shaderCompileTest(fragmentShaderId);
+	}
+	else if (toon == 2)
+	{
+		vertexShaderId = setShader((char*)"vertex", (char*)"vertexShaderToonColours.glsl");
+		std::cout << "::: TOON COLOURS VERTEX SHADER :::" << std::endl;
+		shaderCompileTest(vertexShaderId);
 
-	fragmentShaderToonId = setShader((char*)"fragment", (char*)"fragmentShaderToon.glsl");
-	std::cout << "::: TOON FRAGMENT SHADER :::" << std::endl;
-	shaderCompileTest(fragmentShaderToonId);
+		fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShaderToonColours.glsl");
+		std::cout << "::: TOON COLOURS FRAGMENT SHADER :::" << std::endl;
+		shaderCompileTest(fragmentShaderId);
+	}
+	else
+	{
+		vertexShaderId = setShader((char*)"vertex", (char*)"vertexShaderGouch.glsl");
+		std::cout << "::: SINE VERTEX SHADER :::" << std::endl;
+		shaderCompileTest(vertexShaderId);
+
+		fragmentShaderId = setShader((char*)"fragment", (char*)"fragmentShaderGouch.glsl");
+		std::cout << "::: SINE FRAGMENT SHADER :::" << std::endl;
+		shaderCompileTest(fragmentShaderId);
+	}
 
 	programId = glCreateProgram();
 	glAttachShader(programId, vertexShaderId);
@@ -520,22 +756,28 @@ void setup(void)
 	glLinkProgram(programId);
 	glUseProgram(programId);
 
-	programToonId = glCreateProgram();
-	glAttachShader(programToonId, vertexShaderToonId);
-	glAttachShader(programToonId, fragmentShaderToonId);
-	glLinkProgram(programToonId);
+	/// FREETYPE TEXT ///
 
-	/// DEPTH MAP ///
+	setupFreeFont();
+	
 
 	/// MISC ///
 
 	modelMatLoc = glGetUniformLocation(programId, "modelMat");
+	modelMatToonLoc = glGetUniformLocation(programToonId, "modelMat");
 	objectLoc = glGetUniformLocation(programId, "object");
 	objColorLoc = glGetUniformLocation(programId, "objColor");
 	alphaLoc = glGetUniformLocation(programId, "alpha");
 	blinnLoc = glGetUniformLocation(programId, "blinn");
 	testLoc = glGetUniformLocation(programId, "test");
+	fogLoc = glGetUniformLocation(programId, "fog");
+	offsetLoc = glGetUniformLocation(programId, "offset");
+	offsetArrayLoc = glGetUniformLocation(programId, "offsets");
+	normalMappingLoc = glGetUniformLocation(programId, "normalMapping");
+
+	glUniform1f(fogLoc, 0);
 	glUniform4f(objColorLoc, 1.0, 1.0, 1.0, 1.0);
+	glUniform1i(normalMappingLoc, 0);
 
 	/// Object loading ///
 
@@ -558,13 +800,21 @@ void setup(void)
 	heading.LoadObject((char*)"./Models/line.obj");
 	treeTrunk.LoadObject((char*)"./Models/Tree/treeTrunk.obj");
 	treeTop.LoadObject((char*)"./Models/Tree/treeTop.obj");
+	balloon.LoadObject((char*)"./Models/Balloon/balloon.obj");
+	basket.LoadObject((char*)"./Models/Balloon/basket.obj");
+	basketMain.LoadObject((char*)"./Models/Balloon/basketMain.obj");
+	buns.LoadObject((char*)"./Models/Burger/buns.obj");
+	meat.LoadObject((char*)"./Models/Burger/meat.obj");
+	cheese.LoadObject((char*)"./Models/Burger/cheese.obj");
+	tomato.LoadObject((char*)"./Models/Burger/tomato.obj");
+	seeds.LoadObject((char*)"./Models/Burger/seeds.obj");
 
 	/// Binding stuff ///
 
 	//Generating the VBO's and VAO's
-	glGenVertexArrays(20, vao);
+	glGenVertexArrays(30, vao);
 	//glGenVertexArrays(1, &sunVAO);
-	glGenBuffers(20, buffer);
+	glGenBuffers(30, buffer);
 
 	//Binding test cube
 	testCube.SetupDrawing(vao[0], buffer[0], 0, 1, 2);
@@ -596,6 +846,16 @@ void setup(void)
 	//Tree
 	treeTrunk.SetupDrawing(vao[17], buffer[17], 0, 1, 2);
 	treeTop.SetupDrawing(vao[18], buffer[18], 0, 1, 2);
+	//Balloon
+	balloon.SetupDrawing(vao[19], buffer[19], 0, 1, 2);
+	basket.SetupDrawing(vao[20], buffer[20], 0, 1, 2);
+	basketMain.SetupDrawing(vao[21], buffer[21], 0, 1, 2);
+	//Burger
+	buns.SetupDrawing(vao[22], buffer[22], 0, 1, 2);
+	meat.SetupDrawing(vao[23], buffer[23], 0, 1, 2);
+	cheese.SetupDrawing(vao[24], buffer[24], 0, 1, 2);
+	tomato.SetupDrawing(vao[25], buffer[25], 0, 1, 2);
+	seeds.SetupDrawing(vao[26], buffer[26], 0, 1, 2);
 	/// Camera ///
 
 	camera = new Camera(programId, 40.0f, 1920, 1080, 1.0f, 100.0f, vao[3], buffer[3], objectLoc, modelMatLoc);
@@ -628,24 +888,23 @@ void drawScene(void)
 
 
 	lighting.DrawLighting(vao[0], objectLoc, 4, theta);
-	glUniform3f(objColorLoc, 1.0, 1.0, 1.0);
+	glUniform4f(objColorLoc, 1.0, 1.0, 0.0, 1.0);
 	testCube.DrawObject(vao[0], objectLoc, 4);
 
 	//testcube
-	glUniform3f(objColorLoc, 0.5, 0.7, 1.0);
-	testCube.DrawObject(vao[0], objectLoc, 2, modelMatLoc, glm::vec3(col1Posx, 0, col1Posz));
+	//glUniform4f(objColorLoc, 0.5, 0.7, 1.0, 1.0);
+	//testCube.DrawObject(vao[0], objectLoc, 2, modelMatLoc, glm::vec3(col1Posx, 0, col1Posz));
 	
 	//Grassfield
-	glUniform3f(objColorLoc, 0.0, 0.5, 0.0);
+	glUniform4f(objColorLoc, 0.0, 0.5, 0.0, 1.0);
 	grassfield.DrawObject(vao[1], objectLoc, 0, modelMatLoc, glm::vec3(0, -5, 0));
 
 	//Draw skybox;
 
 	modelMat = glm::mat4(1.0f);
-	//modelMat = glm::translate(modelMat, lighting.lightPos);
-	//modelMat = glm::scale(modelMat, glm::vec3(0.1, 0.1, 0.1));
 	modelMat = glm::rotate(modelMat, glm::radians(skyboxAngle), glm::vec3(0, 1, 0));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+	glUniform4f(objColorLoc, 0.1, 0.1, 0.9, 1.0);
 	//Front
 	skyF.DrawObject(vao[4], objectLoc, 5);
 	//Back
@@ -668,10 +927,15 @@ void drawScene(void)
 	modelMat = glm::scale(modelMat, glm::vec3(1.5, 1.5, 1.5));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
+	glUniform4f(objColorLoc, 0.54, 0.27, 0.07, 1.0);
 	houseBase.DrawObject(vao[9], objectLoc, 10);
+	glUniform4f(objColorLoc, 0.66, 0.66, 0.66, 1.0);
 	houseBody.DrawObject(vao[10], objectLoc, 11);
+	glUniform4f(objColorLoc, 0.74, 0.71, 0.41, 1.0);
 	houseDoor.DrawObject(vao[11], objectLoc, 12);
+	glUniform4f(objColorLoc, 0.86, 0.07, 0.23, 1.0);
 	houseRoof.DrawObject(vao[12], objectLoc, 13);
+	glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
 	houseSides.DrawObject(vao[13], objectLoc, 14);
 
 	//Fence
@@ -680,7 +944,9 @@ void drawScene(void)
 	modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
+	glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
 	fenceSides.DrawObject(vao[14], objectLoc, 15);
+	glUniform4f(objColorLoc, 0.82, 0.82, 0.82, 1.0);
 	fenceBody.DrawObject(vao[15], objectLoc, 16);
 
 	//Heading
@@ -690,17 +956,52 @@ void drawScene(void)
 	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
+	glUniform4f(objColorLoc, 0.5, 0.0, 0.0, 1.0);
 	heading.DrawObject(vao[16], objectLoc, 17);
 
 	//Tree
 	modelMat = glm::mat4(1.0f);
-	modelMat = glm::translate(modelMat, glm::vec3(10, -5, 40));
+	//modelMat = glm::translate(modelMat, glm::vec3(10, -5, 40));// -x - front / +z - right
 	modelMat = glm::scale(modelMat, glm::vec3(2.5, 2.5, 2.5));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+
+	glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
+	//treeTrunk.DrawObject(vao[17], objectLoc, 18);
+	treeTrunk.DrawObjectInstance(vao[17], objectLoc, 18, 6);
+	glUniform4f(objColorLoc, 0.13, 0.54, 0.13, 1.0);
+	treeTop.DrawObjectInstance(vao[18], objectLoc, 19, 6);
+	//treeTop.DrawObject(vao[18], objectLoc, 19);
+
+	//Balloon
+	modelMat = glm::mat4(1.0f);
+	modelMat = glm::translate(modelMat, glm::vec3(30, balloonY, balloonZ));
+	modelMat = glm::scale(modelMat, glm::vec3(1.0, 1.0, 1.0));
 	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	treeTrunk.DrawObject(vao[17], objectLoc, 18);
-	treeTop.DrawObject(vao[18], objectLoc, 19);
+	glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
+	balloon.DrawObject(vao[19], objectLoc, 20);
+	glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
+	basket.DrawObject(vao[20], objectLoc, 21);
+	glUniform4f(objColorLoc, 0.82, 0.70, 0.54, 1.0);
+	basketMain.DrawObject(vao[21], objectLoc, 22);
+
+	//Burger
+	modelMat = glm::mat4(1.0f);
+	modelMat = glm::translate(modelMat, glm::vec3(-40, -2, 0));
+	modelMat = glm::scale(modelMat, glm::vec3(1, 1, 1));
+	modelMat = glm::rotate(modelMat, glm::radians(theta), glm::vec3(0, 1, 0));
+	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+
+	glUniform4f(objColorLoc, 0.96, 0.87, 0.70, 1.0);
+	buns.DrawObject(vao[22], objectLoc, 23);
+	glUniform4f(objColorLoc, 0.64, 0.16, 0.16, 1.0);
+	meat.DrawObject(vao[23], objectLoc, 24);
+	glUniform4f(objColorLoc, 0.5, 0.5, 0.0, 1.0);
+	cheese.DrawObject(vao[24], objectLoc, 25);
+	glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
+	tomato.DrawObject(vao[25], objectLoc, 26);
+	//seeds.DrawObject(vao[26], objectLoc, 27);
 
 	//Angle corrections
 	if (theta > 360)
@@ -721,6 +1022,11 @@ void idle()
 {
 	Sleep(1000 / 60);
 	theta += 0.08;
+	
+	balloonZ += off;
+	balloonY += sin(3.1415 * theta) * deltaTime / 1000.0f;
+	if (balloonZ > 40.0f || balloonZ <= -20.0f)
+		off *= -1;
 
 	if (theta <= 90.0)
 		alpha = theta / 90.0;
@@ -751,24 +1057,40 @@ void idle()
 				SphereCollider *col2 = (SphereCollider*)camera->balls[j]->collider;
 
 				if (col1->collidesWithSphere(col2))//If it collides
-				{
 					camera->balls[i]->collides(camera->balls[j], 1);
-				}
-
-				//if (col1->collidesWith(cubeCol1))
-				//	camera->balls[i]->collidesWall(cubeCol1);
-				//if (col2->collidesWith(cubeCol1))
-				//	camera->balls[j]->collidesWall(cubeCol1);
 			}		
 		}
 	}
 
+	//for (std::vector<Object>::size_type i = 0; i != camera->balls.size(); i++)
+	//{
+	//	SphereCollider *col1 = (SphereCollider*)camera->balls[i]->collider;
+	//	if (col1->collidesWithCube(cubeCol1))
+	//		camera->balls[i]->collidesWall(cubeCol1);
+	//}
+
+	glUniform1i(offsetLoc, glutGet(GLUT_ELAPSED_TIME));
+
 	glutPostRedisplay();
 }
+
+void generateOffsets()
+{
+	/*offsets[0] = glm::vec2(10, 40);
+	offsets[1] = glm::vec2(5, 45);
+
+	for (int i = 0; i < 1; i++)
+	{
+		glUniform2f(glGetUniformLocation(programId, "offsets[" + i + "]"), offsets[i].x, offsets[i].y);
+	}*/
+}
+
 
 // Main routine.
 int main(int argc, char* argv[])
 {
+	generateOffsets();
+
 	glutInit(&argc, argv);
 
 	glutInitContextVersion(4, 3);
@@ -905,29 +1227,21 @@ int main(int argc, char* argv[])
 		}
 		else if (key == 'b')
 		{
-			if (toon == 1)
-			{
-				//glAttachShader(programId, vertexShaderToonId);
-				//glAttachShader(programId, fragmentShaderToonId);
-				tempId = programId;
-				programId = programToonId;
-				programToonId = tempId;
-				glUseProgram(programId);
-				std::cout << "Toon shader!" << std::endl;
-			}
-			else
-			{
-				//glAttachShader(programId, vertexShaderId);
-				//glAttachShader(programId, fragmentShaderId);
-				tempId = programToonId;
-				programToonId = programId;
-				programId = tempId;
-				glUseProgram(programId);
-				std::cout << "Normal shader!" << std::endl;
-			}
-			toon *= -1;
+			toon ++;
+			if (toon > 3)
+				toon = 0;
+			setup();
 		}
-
+		else if (key == 'm')
+		{
+			glUniform1i(fogLoc, fog);
+			fog *= -1;
+		}
+		else if (key == 'n')
+		{
+			normalMapping *= -1;
+			glUniform1i(normalMappingLoc, normalMapping);
+		}
 	});
 
 	glutSpecialFunc([](int key, int x, int y) {
@@ -958,11 +1272,14 @@ int main(int argc, char* argv[])
 
 	glutMainLoop();
 }
-
-//Questions: switch between shaders
-//Fix heading
-//Instance trees
-//Fix normal mapping
+//Fix normal mapping - kinda doneeeee
 //Fix ball wall collision
 //Fix curved shot angle
 //Take look at physics code
+//https://gamedev.stackexchange.com/questions/79459/2d-outline-shader-in-glsl
+//http://in2gpu.com/2014/06/23/toon-shading-effect-and-simple-contour-detection/
+
+//Draw object outline: use stencil buffer / draw object twice, cull backfaces / edge detection post-processing / some geometry shader stuff
+//Add air drag
+//weather physics effect
+//Instantiate trees - add values

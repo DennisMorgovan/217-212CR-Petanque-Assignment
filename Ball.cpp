@@ -9,8 +9,8 @@ Ball::Ball(glm::vec3 position, glm::vec3 cameraFront, unsigned int objectLoc, un
 
 	velocity = glm::vec3(0.0f, 0.0f, 0.0f);
 
-	//surfaceArea = colliderSize * colliderSize;
-	dragC = 0.1;
+	surfaceArea = 3.1415 * colRadius * colRadius; //Side sphere area = pi * r^2
+	dragC = 0.1; //Coefficient of a smooth sphere
 
 	this->heading = cameraFront;
 	this->speed = speed;
@@ -18,12 +18,15 @@ Ball::Ball(glm::vec3 position, glm::vec3 cameraFront, unsigned int objectLoc, un
 	this->rotation = rotation;
 	this->position = position; //Resetting the position before instantiating ball 
 	this->mass = mass;
+	this->airDensity = 1.225f;
 
 	this->modelMat = glm::mat4(1.0f);
 	this->modelMat = glm::translate(modelMat, position);
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
 	position0 = glm::vec3(0, 0, 0);
+	velocityMagnitude = 0.0f;
+	airDrag = 1.0f;
 
 	//std::cout << position.x << " " << position.y << " " << position.z << std::endl;
 }
@@ -67,12 +70,11 @@ void Ball::collides(Ball* otherBall, float materialBounce)
 
 		this->velocity = velocity1Parallel + velocity1Ortho;
 		otherBall->velocity = velocity2Parallel + velocity2Ortho;
-	//std::cout << "Collision!" << std::endl;
 }
 
 void Ball::collidesWall(CubeCollider* other)
 {
-	glm::vec3 velocity1;
+	/*glm::vec3 velocity1;
 
 	glm::vec3 collisionNormal = glm::normalize(this->position - other->GetCenter()); //Obtaining the normal of the collision plane (vector connecting two collision points)
 	glm::vec3 collisionDirection(-collisionNormal.y, collisionNormal.x, 0.0f); //Direction of the normal
@@ -82,8 +84,13 @@ void Ball::collidesWall(CubeCollider* other)
 
 	glm::vec3 velocity1ParallelNew = (velocity1Parallel * (this->mass - 10.0f)) / (this->mass + 10.0f);
 	velocity1Parallel = velocity1ParallelNew;
-	this->velocity = velocity1Parallel + velocity1Ortho;
-	std::cout << "Collision!" << std::endl;
+	this->velocity = velocity1Parallel + velocity1Ortho;*/
+
+	//this->velocity *= -1;
+	this->heading *= -1;
+	this->velocity *= -1;
+
+	std::cout << "Collision wall!" << std::endl;
 }
 
 void Ball::SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex, int locationNormals)
@@ -105,7 +112,8 @@ void Ball::SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, in
 
 void Ball::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime)
 {
-	//airDrag = (p * currentspeedMagnitude * currentspeedMagnitude * surfaceArea * dragC) / 2;
+	 //Calculating air drag
+	//std::cout << airDrag <<std::endl;
 	this->delta = deltaTime / 1000.0f;
 
 	if (rotation) //???
@@ -116,13 +124,13 @@ void Ball::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj
 
 	this->position += this->velocity * this->delta /** glm::vec3(cos((PI / 180.0) * rotation), 0.0f, sin((PI / 180.0) * rotation))*/;
 
-	this->velocity = this->heading * this->speed;
+	this->velocity = (this->heading) * (this->speed);
+
 	this->speed *= frictionFactor;
-	rotation *= frictionFactor;
+	this->rotation *= frictionFactor;
 
-	float velocityMagnitude = magnitude(velocity);
-	//std::cout << velocityMagnitude << std::endl;
-
+	velocityMagnitude = magnitude(velocity);
+	airDrag = (airDensity * velocityMagnitude * velocityMagnitude * surfaceArea * dragC) / 2;
 	if (velocityMagnitude <= 0.35f)
 	{
 		speed = 0.0f;
@@ -130,9 +138,10 @@ void Ball::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj
 	}
 
 	collider->SetCenter(this->position);
+
+	//Drawing sphere
 	glUniform1ui(objectLoc, obj);
 	glBindVertexArray(vao);
-	//std::cout << velocityMagnitude << std::endl;
 	
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::translate(modelMat, position);

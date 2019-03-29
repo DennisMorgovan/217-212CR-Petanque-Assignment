@@ -12,6 +12,7 @@ in vec4 colorsExport;
 in vec2 texCoordsExport;
 in vec3 normals;
 in vec3 fragPos;
+in float visibility;
 
 //FINAL COLOUR FOR THE PIXEL
 out vec4 outC;
@@ -27,6 +28,8 @@ uniform sampler2D skyTexFt, skyTexBk, skyTexLf, skyTexRt, skyTexUp, skyTexDn;
 uniform sampler2D skyTexNightFt, skyTexNightBk, skyTexNightLf, skyTexNightRt, skyTexNightUp;
 uniform sampler2D fenceSidesTex, fenceBodyTex;
 uniform sampler2D treeTopTex, treeTrunkTex;
+uniform sampler2D seedsTex, tomatoTex, bunTex, meatTex, cheeseTex;
+uniform sampler2D basketTex, basketSideTex, balloonTex;
 
 uniform sampler2D fenceBodyNormalMap;
 
@@ -38,10 +41,10 @@ uniform vec3 lightPos;
 uniform vec3 cameraPos;
 uniform float ambientIntensity;
 uniform float specularIntensity;
-uniform vec3 objColor;
+uniform vec4 objColor;
 
 uniform float alpha;
-uniform int blinn;
+uniform int blinn, fog, normalMapping;
 uniform int test;
 
 //Texture colors
@@ -54,11 +57,14 @@ vec4 skyTexFtColor, skyTexBkColor, skyTexLfColor, skyTexRtColor, skyTexUpColor, 
 vec4 skyTexNightFtColor, skyTexNightBkColor, skyTexNightLfColor, skyTexNightRtColor, skyTexNightUpColor;
 vec4 fenceSidesTexColor, fenceBodyTexColor;
 vec4 treeTopTexColor, treeTrunkTexColor;
+vec4 cheeseTexColor, seedsTexColor, bunTexColor, tomatoTexColor, meatTexColor, balloonTexColor, basketTexColor, basketSideTexColor;
 
 vec4 skyTexFtFinal, skyTexBkFinal, skyTexLfFinal, skyTexRtFinal, skyTexUpFinal; //Blended textures
 
 vec3 norm;
 vec3 lightDirection;
+
+vec3 fogColour = vec3(0.1, 0.1, 0.1);
 
 void main(void)
 {
@@ -86,6 +92,10 @@ void main(void)
    fenceBodyTexColor = texture(fenceBodyTex, texCoordsExport);
    treeTopTexColor = texture(treeTopTex, texCoordsExport);
    treeTrunkTexColor = texture(treeTrunkTex, texCoordsExport);
+   cheeseTexColor = texture(cheeseTex, texCoordsExport); meatTexColor = texture(meatTex, texCoordsExport); tomatoTexColor = texture(tomatoTex, texCoordsExport); bunTexColor = texture(bunTex, texCoordsExport); seedsTexColor = texture(seedsTex, texCoordsExport);
+   balloonTexColor = texture(balloonTex, texCoordsExport);
+   basketTexColor = texture(basketTex, texCoordsExport);
+   basketSideTexColor = texture(basketSideTex, texCoordsExport);
 
    norm = normalize(normals);
 
@@ -150,7 +160,8 @@ void main(void)
    else if (object == 16)
    {
 		colorsOut = fenceBodyTexColor;
-		norm = normalize(texture(fenceBodyNormalMap, texCoordsExport).rgb * 2.0 - 1.0);
+		if(normalMapping == 1)
+			norm = -normalize(texture(fenceBodyNormalMap, texCoordsExport).rgb * 2.0 - 1.0); //Applying normal mapping
    }
    else if (object == 17)
 		colorsOut = vec4(0.5, 0, 0, 1.0);
@@ -158,6 +169,22 @@ void main(void)
 		colorsOut = treeTrunkTexColor;
    else if (object == 19)
 		colorsOut = treeTopTexColor;
+   else if (object == 20)
+		colorsOut = balloonTexColor;
+   else if (object == 21)
+		colorsOut = basketSideTexColor;
+   else if (object == 22)
+		colorsOut = basketTexColor;
+   else if (object == 23)
+		colorsOut = bunTexColor;
+   else if (object == 24)
+		colorsOut = meatTexColor;
+   else if (object == 25)
+		colorsOut = cheeseTexColor;
+   else if (object == 26)
+		colorsOut = vec4(0.5, 0.0, 0.0, 1.0);
+   else if (object == 27)
+		colorsOut = seedsTexColor;
    else
 		colorsOut = vec4(0.5, 0, 0, 1.0);
 
@@ -206,5 +233,8 @@ void main(void)
 		outC = skyTexUpFinal;
    else
 		outC = vec4(result, 1.0);
+
+    if(fog == 1)
+		outC = mix(vec4(fogColour, 1.0), vec4(result, 1.0), visibility);
 
 }

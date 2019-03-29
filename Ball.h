@@ -18,11 +18,12 @@ class Ball : public Object
 private:
 	float speed, angle, rotation;
 	float delta;
+	float velocityMagnitude;
 	glm::vec3 velocity;
 
 	float frictionFactor = 0.99f;
 	//dragC = air drag coefficient; surface area = surface area of front of collider
-	float colliderSize, airDrag, dragC, surfaceArea, mass;
+	float colliderSize, airDrag, dragC, airDensity, surfaceArea, mass;
 public:
 	glm::mat4 modelMat;
 	glm::vec3 heading; ///<Starting facing direction of the Hovercraft.

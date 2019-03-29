@@ -46,6 +46,8 @@ Camera::~Camera()
 
 void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 {
+
+
 	for (int i = 0; i < balls.size(); i++)
 		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, deltaTime);
 
@@ -71,17 +73,6 @@ void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 			cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * deltaSpeed;
 
 		cameraUp = glm::vec3(0, 1, 0);
-
-		//Draws the heading line
-		/*glBindVertexArray(lineVAO);
-
-
-		//glm::mat4 modelMat = glm::mat4(1.0f);
-		glm::mat4 modelMat = glm::translate(modelMat, cameraPos);
-		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
-		glDrawArrays(GL_LINES, 0, 2);*/
-
-		//std::cout << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << std::endl;
 
 		//Sets the viewMatrix: vec3(pos, target, up)
 		view = glm::mat4(1.0f);
@@ -116,8 +107,6 @@ void Camera::update(int deltaTime, float ballAngle, float ballRotation)
 
 	//Sends the camera's position to the fragment shader
 	glUniform3f(cameraPosLoc, cameraPos.x, cameraPos.y, cameraPos.z);
-
-
 }
 
 void Camera::mouseControl(int key, int state, int x, int y, unsigned int objectLoc, unsigned int modelMatLoc, float speed, float angle, float rotation)
@@ -125,7 +114,7 @@ void Camera::mouseControl(int key, int state, int x, int y, unsigned int objectL
 	//If player presses left mouse and the time interval has passed, spawn a ball at 
 	if (key == GLUT_LEFT_BUTTON && s > 20)
 	{
-		Ball *ball = new Ball(this->cameraPos + glm::vec3(7, -4, 0), this->cameraFront, objectLoc, modelMatLoc, speed, angle, rotation, 5.0);
+		Ball *ball = new Ball(this->cameraPos + glm::vec3(7, -4, 0), this->cameraFront, objectLoc, modelMatLoc, speed, angle, rotation, 5.0f);
 		ball->LoadObject((char*)"./Models/BallScaled.obj");
 		ball->SetupDrawing(vao, buffer, 0, 1, 2);
 		

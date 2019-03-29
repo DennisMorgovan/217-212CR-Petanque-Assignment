@@ -163,3 +163,11 @@ void Object::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int o
 	glDrawArrays(GL_TRIANGLES, 0, faceNumber * 3);
 }
 
+void Object::DrawObjectInstance(unsigned int vao, unsigned int objectLoc, unsigned int obj, int instanceNumber)
+{
+	glUniform1ui(objectLoc, obj);
+	glBindVertexArray(vao);
+
+	glDrawArraysInstanced(GL_TRIANGLES, 0, faceNumber * 3, instanceNumber);
+}
+

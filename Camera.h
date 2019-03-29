@@ -17,7 +17,6 @@
 
 #include <map>
 #include <iostream>
-//#include "./src/Ball.h"
 #include "Ball.h"
 #include <vector>
 
