@@ -24,7 +24,6 @@ Ball::Ball(glm::vec3 position, glm::vec3 cameraFront, unsigned int objectLoc, un
 	this->modelMat = glm::translate(modelMat, position);
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	position0 = glm::vec3(0, 0, 0);
 	velocityMagnitude = 0.0f;
 	airDrag = 1.0f;
 
@@ -38,10 +37,6 @@ Ball::~Ball()
 	Ball::collider = NULL;
 }
 
-void Ball::update(int deltaTime, unsigned int programId, unsigned int modelMatLoc)
-{
-
-}
 
 float Ball::magnitude(glm::vec3 a)
 {
@@ -74,19 +69,6 @@ void Ball::collides(Ball* otherBall, float materialBounce)
 
 void Ball::collidesWall(CubeCollider* other)
 {
-	/*glm::vec3 velocity1;
-
-	glm::vec3 collisionNormal = glm::normalize(this->position - other->GetCenter()); //Obtaining the normal of the collision plane (vector connecting two collision points)
-	glm::vec3 collisionDirection(-collisionNormal.y, collisionNormal.x, 0.0f); //Direction of the normal
-
-	glm::vec3 velocity1Parallel = glm::dot(collisionNormal, this->velocity) * collisionNormal;
-	glm::vec3 velocity1Ortho = glm::dot(collisionDirection, this->velocity) * collisionDirection;
-
-	glm::vec3 velocity1ParallelNew = (velocity1Parallel * (this->mass - 10.0f)) / (this->mass + 10.0f);
-	velocity1Parallel = velocity1ParallelNew;
-	this->velocity = velocity1Parallel + velocity1Ortho;*/
-
-	//this->velocity *= -1;
 	this->heading *= -1;
 	this->velocity *= -1;
 
@@ -110,59 +92,61 @@ void Ball::SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, in
 	glEnableVertexAttribArray(locationNormals);
 }
 
-void Ball::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime)
+void Ball::DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime, int wind, int airDragOn)
 {
-	 //Calculating air drag
-	//std::cout << airDrag <<std::endl;
-	this->delta = deltaTime / 1000.0f;
+	if(airDragOn == 1) //Applies air drag, reducing it by 1000 since it is too strong
+		this->heading.x -= airDrag / 1000.0f;
 
-	if (rotation) //???
+	if (wind == 1) //Wind force, applied on the z axis of the ball
 	{
-		this->position.x += cos((PI / 180.0) * rotation) / 10.0f;
-		this->position.z += sin((PI / 180.0) * rotation) / 10.0f;
+		this->heading.z += 0.005f;
+		if (velocityMagnitude <= 0.55f)
+		{
+			speed = 0.0f;
+			rotation = 0.0f;
+		}
 	}
 
-	this->position += this->velocity * this->delta /** glm::vec3(cos((PI / 180.0) * rotation), 0.0f, sin((PI / 180.0) * rotation))*/;
+	if (rotation) //Applies curved path to the ball
+	{
+		this->heading.x += cos((PI / 180.0) * rotation)* 8.5 / 1000.0f;
+		this->heading.z += sin((PI / 180.0) * rotation)* 8.5 / 1000.0f;
+	}
 
+	//Movement calculations (velocity, friction and position update)
+	this->delta = deltaTime / 1000.0f;
+
+	this->position += this->velocity * this->delta;
 	this->velocity = (this->heading) * (this->speed);
 
 	this->speed *= frictionFactor;
 	this->rotation *= frictionFactor;
 
 	velocityMagnitude = magnitude(velocity);
+
+
+	//Calculating air drag
 	airDrag = (airDensity * velocityMagnitude * velocityMagnitude * surfaceArea * dragC) / 2;
+
+	//Setting the speed of the ball to 0 after a certain amount, this is to prevent the ball from rolling uncontrollably.
 	if (velocityMagnitude <= 0.35f)
 	{
 		speed = 0.0f;
 		rotation = 0.0f;
 	}
 
-	collider->SetCenter(this->position);
+	collider->SetCenter(this->position); //Updates collider centre
 
-	//Drawing sphere
+
+
+	//Drawing routine
 	glUniform1ui(objectLoc, obj);
 	glBindVertexArray(vao);
-	
-	modelMat = glm::mat4(1.0f);
-	modelMat = glm::translate(modelMat, position);
-	if (velocityMagnitude)
-	{
-		//modelMat = glm::rotate(modelMat, -testAngle, glm::vec3(0, 0, 1));
-		modelMat = glm::rotate(modelMat, velocityMagnitude, glm::vec3(0, 0, 1));
-		
-	}
+		modelMat = glm::mat4(1.0f);
+		modelMat = glm::translate(modelMat, position);
+			if (velocityMagnitude) //Applies ball roll; directly proportionate to the ball's speed (the slower the ball, the slower the rotation)
+				modelMat = glm::rotate(modelMat, velocityMagnitude, glm::vec3(0, 0, 1));
 	
 	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
-
 	glDrawArrays(GL_TRIANGLES, 0, faceNumber * 3);
-
-	testAngle += 0.1f;
-
-	if (testAngle >= 360.0f)
-		testAngle = 0;
-}
-
-void Ball::DrawCollider()
-{
-
 }

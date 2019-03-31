@@ -44,12 +44,12 @@ Camera::~Camera()
 	balls.clear();
 }
 
-void Camera::update(int deltaTime, float ballAngle, float ballRotation)
+void Camera::update(int deltaTime, float ballAngle, float ballRotation, int wind, int airDragOn)
 {
 
 
 	for (int i = 0; i < balls.size(); i++)
-		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, deltaTime);
+		balls[i]->DrawObject(vao, objectLoc, 3, modelMatLoc, deltaTime, wind, airDragOn);
 
 	if (cameraMode == 0)
 	{

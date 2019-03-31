@@ -46,9 +46,6 @@ std::map<GLchar, Character> Characters;
 glm::vec2 offsets[10];
 float col1Posx = 60, col1Posz = 10; //x - send object back(+) or front(-); z - send object left(+) or right(-)
 
-static enum object { FIELD, SKY, CUBE }; // VAO ids.
-static enum buffer { FIELD_VERTICES, SKY_VERTICES }; // VBO ids.
-
 glm::mat4 modelMat(1.0f);
 glm::mat4 viewMat(1.0f);
 glm::mat4 projMat(1.0f);
@@ -67,7 +64,7 @@ Lighting lighting(glm::vec3(0, 10, -25));
 
 //CubeCollider* cubeCol1 = new CubeCollider(glm::vec3(col1Posx, 0, col1Posz), 1.0f, 1.0f, 1.0f, 0);
 
-/// Holds 2 buffer objects
+/// Holds buffer objects
 unsigned int buffer[30];
 //VAOs and buffers from 4 to 9 are used for skybox
 unsigned int vao[30]; // Array of VAO ids.
@@ -77,7 +74,7 @@ unsigned int texture[35]; // Array of VAO ids.
 static BitMapFile *image[35]; // Local storage for bmp image data.
 static BitMapFile *normalMaps[30]; // Local storage for bmp normal maps data.
 
-///Setup shaders and send data to them
+///Various uniform locations
 unsigned int programId, programToonId, vertexShaderId, fragmentShaderId, vertexShaderToonId, fragmentShaderToonId, modelMatLoc, tempId;
 unsigned int modelMatToonLoc, temp;
 unsigned int objectLoc, grassTexLoc, skyTexLoc, cubeTexLoc, ballTexLoc, sunTexLoc, objColorLoc;
@@ -99,7 +96,7 @@ float ballAngle = 0.0f, ballRotation = 0.0f, ballSpeed = 1.0f, balloonZ = 40.0f,
 float skyboxAngle = 0.0f;
 float theta= 0, alpha = 0;
 float camX = 0, camZ = 0;
-int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1, toon = 0, fog = 1, normalMapping = -1;
+int msaa = 1, antialias = 1, blinn = 1, wireframe = 1, debug = 1, toon = 0, fog = 1, normalMapping = -1, wind = -1, airDragOn = -1;
 
 void loadExternalTextures()
 {
@@ -114,7 +111,6 @@ void loadExternalTextures()
 	image[6] = getbmp("./Textures/Skybox/hourglass_lf.bmp");
 	image[7] = getbmp("./Textures/Skybox/hourglass_rt.bmp");
 	image[8] = getbmp("./Textures/Skybox/hourglass_up.bmp");
-	//image[9] = getbmp("./Textures/Skybox/hourglass_dn.bmp");
 	//Skybox night
 	image[9] = getbmp("./Textures/SkyboxNight/purplenebula_ft.bmp");
 
@@ -700,14 +696,9 @@ void setupFreeFont()
 	FT_Done_FreeType(ft);
 }
 
-// Initialization routine.
-void setup(void)
+void switchShaders()
 {
-	glClearColor(0.2, 0.5, 0.4, 0.0);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	
+	/// SHADERS ///
 	if (toon == 0)
 	{
 		// Create shader program executable.
@@ -756,11 +747,6 @@ void setup(void)
 	glLinkProgram(programId);
 	glUseProgram(programId);
 
-	/// FREETYPE TEXT ///
-
-	setupFreeFont();
-	
-
 	/// MISC ///
 
 	modelMatLoc = glGetUniformLocation(programId, "modelMat");
@@ -779,6 +765,34 @@ void setup(void)
 	glUniform4f(objColorLoc, 1.0, 1.0, 1.0, 1.0);
 	glUniform1i(normalMappingLoc, 0);
 
+	/// Textures ///
+
+	loadExternalTextures();
+	loadNormalMaps();
+
+	/// Camera ///
+
+	camera = new Camera(programId, 40.0f, 1920, 1080, 1.0f, 100.0f, vao[3], buffer[3], objectLoc, modelMatLoc);
+
+	/// Lighting ///
+
+	lighting.SetupLighting(programId);
+}
+
+// Initialization routine.
+void setup(void)
+{
+	glClearColor(0.2, 0.5, 0.4, 0.0);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	switchShaders();
+
+	/// FREETYPE TEXT ///
+
+	setupFreeFont();
+	
 	/// Object loading ///
 
 	testCube.LoadObject((char*)"./Models/testCube.obj");
@@ -822,7 +836,6 @@ void setup(void)
 	grassfield.SetupDrawing(vao[1], buffer[1], 0, 1, 2);
 
 	//ball.SetupDrawing(vao[3], buffer[3], 0, 1, 2);
-	//skybox.SetupDrawing(vao[4], buffer[4]);
 	skyF.SetupDrawing(vao[4], buffer[4], 0, 1, 2);
 	skyB.SetupDrawing(vao[5], buffer[5], 0, 1, 2);
 	skyLf.SetupDrawing(vao[6], buffer[6], 0, 1, 2);
@@ -856,27 +869,16 @@ void setup(void)
 	cheese.SetupDrawing(vao[24], buffer[24], 0, 1, 2);
 	tomato.SetupDrawing(vao[25], buffer[25], 0, 1, 2);
 	seeds.SetupDrawing(vao[26], buffer[26], 0, 1, 2);
-	/// Camera ///
-
-	camera = new Camera(programId, 40.0f, 1920, 1080, 1.0f, 100.0f, vao[3], buffer[3], objectLoc, modelMatLoc);
-
-	/// Textures ///
-
-	loadExternalTextures();
-	loadNormalMaps();
-
-	/// Lighting ///
-
-	lighting.SetupLighting(programId);
 }
 
 // Drawing routine.
 void drawScene(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	/// CAMERA ///
 
-	camera->update(deltaTime, ballAngle, ballRotation);
+	camera->update(deltaTime, ballAngle, ballRotation, wind, airDragOn);
 
 	/// DRAWING ///
 
@@ -884,37 +886,36 @@ void drawScene(void)
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::translate(modelMat, lighting.lightPos);
 	modelMat = glm::scale(modelMat, glm::vec3(0.1, 0.1, 0.1));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-
-	lighting.DrawLighting(vao[0], objectLoc, 4, theta);
-	glUniform4f(objColorLoc, 1.0, 1.0, 0.0, 1.0);
-	testCube.DrawObject(vao[0], objectLoc, 4);
+		lighting.DrawLighting(vao[0], objectLoc, 4, theta);
+		glUniform4f(objColorLoc, 1.0, 1.0, 0.0, 1.0);
+		testCube.DrawObject(vao[0], objectLoc, 4);
 
 	//testcube
 	//glUniform4f(objColorLoc, 0.5, 0.7, 1.0, 1.0);
 	//testCube.DrawObject(vao[0], objectLoc, 2, modelMatLoc, glm::vec3(col1Posx, 0, col1Posz));
 	
 	//Grassfield
-	glUniform4f(objColorLoc, 0.0, 0.5, 0.0, 1.0);
-	grassfield.DrawObject(vao[1], objectLoc, 0, modelMatLoc, glm::vec3(0, -5, 0));
+		glUniform4f(objColorLoc, 0.0, 0.5, 0.0, 1.0);
+		grassfield.DrawObject(vao[1], objectLoc, 0, modelMatLoc, glm::vec3(0, -5, 0));
 
 	//Draw skybox;
 
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::rotate(modelMat, glm::radians(skyboxAngle), glm::vec3(0, 1, 0));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
-	glUniform4f(objColorLoc, 0.1, 0.1, 0.9, 1.0);
-	//Front
-	skyF.DrawObject(vao[4], objectLoc, 5);
-	//Back
-	skyB.DrawObject(vao[5], objectLoc, 6);
-	//Left
-	skyLf.DrawObject(vao[6], objectLoc, 7);
-	//Right
-	skyRt.DrawObject(vao[7], objectLoc, 8);
-	//Up
-	skyUp.DrawObject(vao[8], objectLoc, 9);
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniform4f(objColorLoc, 0.1, 0.1, 0.9, 1.0);
+		//Front
+		skyF.DrawObject(vao[4], objectLoc, 5);
+		//Back
+		skyB.DrawObject(vao[5], objectLoc, 6);
+		//Left
+		skyLf.DrawObject(vao[6], objectLoc, 7);
+		//Right
+		skyRt.DrawObject(vao[7], objectLoc, 8);
+		//Up
+		skyUp.DrawObject(vao[8], objectLoc, 9);
 
 	//Draw ball
 	//glUniform4f(objColorLoc, 0.2, 0.5, 0.5, 1.0);
@@ -925,83 +926,76 @@ void drawScene(void)
 	modelMat = glm::rotate(modelMat, glm::radians(180.0f), glm::vec3(0, 1, 0));
 	modelMat = glm::translate(modelMat, glm::vec3(-45, -5, 30));
 	modelMat = glm::scale(modelMat, glm::vec3(1.5, 1.5, 1.5));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	glUniform4f(objColorLoc, 0.54, 0.27, 0.07, 1.0);
-	houseBase.DrawObject(vao[9], objectLoc, 10);
-	glUniform4f(objColorLoc, 0.66, 0.66, 0.66, 1.0);
-	houseBody.DrawObject(vao[10], objectLoc, 11);
-	glUniform4f(objColorLoc, 0.74, 0.71, 0.41, 1.0);
-	houseDoor.DrawObject(vao[11], objectLoc, 12);
-	glUniform4f(objColorLoc, 0.86, 0.07, 0.23, 1.0);
-	houseRoof.DrawObject(vao[12], objectLoc, 13);
-	glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
-	houseSides.DrawObject(vao[13], objectLoc, 14);
+		glUniform4f(objColorLoc, 0.54, 0.27, 0.07, 1.0);
+		houseBase.DrawObject(vao[9], objectLoc, 10);
+		glUniform4f(objColorLoc, 0.66, 0.66, 0.66, 1.0);
+		houseBody.DrawObject(vao[10], objectLoc, 11);
+		glUniform4f(objColorLoc, 0.74, 0.71, 0.41, 1.0);
+		houseDoor.DrawObject(vao[11], objectLoc, 12);
+		glUniform4f(objColorLoc, 0.86, 0.07, 0.23, 1.0);
+		houseRoof.DrawObject(vao[12], objectLoc, 13);
+		glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
+		houseSides.DrawObject(vao[13], objectLoc, 14);
 
 	//Fence
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::translate(modelMat, glm::vec3(-20, -4.7, 30));
 	modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
-	fenceSides.DrawObject(vao[14], objectLoc, 15);
-	glUniform4f(objColorLoc, 0.82, 0.82, 0.82, 1.0);
-	fenceBody.DrawObject(vao[15], objectLoc, 16);
+		glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
+		fenceSides.DrawObject(vao[14], objectLoc, 15);
+		glUniform4f(objColorLoc, 0.82, 0.82, 0.82, 1.0);
+		fenceBody.DrawObject(vao[15], objectLoc, 16);
 
 	//Heading
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::rotate(modelMat, glm::radians(-camera->yaw), glm::vec3(0, 1, 0));
 	modelMat = glm::translate(modelMat,camera->cameraPos + glm::vec3(0, -5, 0));
-	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniform4f(objColorLoc, 0.5, 0.0, 0.0, 1.0);
+		heading.DrawObject(vao[16], objectLoc, 17);
 
-	glUniform4f(objColorLoc, 0.5, 0.0, 0.0, 1.0);
-	heading.DrawObject(vao[16], objectLoc, 17);
-
-	//Tree
+	//Tree, instance rendered
 	modelMat = glm::mat4(1.0f);
-	//modelMat = glm::translate(modelMat, glm::vec3(10, -5, 40));// -x - front / +z - right
 	modelMat = glm::scale(modelMat, glm::vec3(2.5, 2.5, 2.5));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
-
-	glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
-	//treeTrunk.DrawObject(vao[17], objectLoc, 18);
-	treeTrunk.DrawObjectInstance(vao[17], objectLoc, 18, 6);
-	glUniform4f(objColorLoc, 0.13, 0.54, 0.13, 1.0);
-	treeTop.DrawObjectInstance(vao[18], objectLoc, 19, 6);
-	//treeTop.DrawObject(vao[18], objectLoc, 19);
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniform4f(objColorLoc, 0.75, 0.60, 0.41, 1.0);
+		treeTrunk.DrawObjectInstance(vao[17], objectLoc, 18, 19);
+		glUniform4f(objColorLoc, 0.13, 0.54, 0.13, 1.0);
+		treeTop.DrawObjectInstance(vao[18], objectLoc, 19, 19);
 
 	//Balloon
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::translate(modelMat, glm::vec3(30, balloonY, balloonZ));
 	modelMat = glm::scale(modelMat, glm::vec3(1.0, 1.0, 1.0));
-	//modelMat = glm::scale(modelMat, glm::vec3(0.5, 0.5, 0.5));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
-	balloon.DrawObject(vao[19], objectLoc, 20);
-	glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
-	basket.DrawObject(vao[20], objectLoc, 21);
-	glUniform4f(objColorLoc, 0.82, 0.70, 0.54, 1.0);
-	basketMain.DrawObject(vao[21], objectLoc, 22);
+		glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
+		balloon.DrawObject(vao[19], objectLoc, 20);
+		glUniform4f(objColorLoc, 0.1, 0.1, 0.1, 1.0);
+		basket.DrawObject(vao[20], objectLoc, 21);
+		glUniform4f(objColorLoc, 0.82, 0.70, 0.54, 1.0);
+		basketMain.DrawObject(vao[21], objectLoc, 22);
 
 	//Burger
 	modelMat = glm::mat4(1.0f);
 	modelMat = glm::translate(modelMat, glm::vec3(-40, -2, 0));
 	modelMat = glm::scale(modelMat, glm::vec3(1, 1, 1));
 	modelMat = glm::rotate(modelMat, glm::radians(theta), glm::vec3(0, 1, 0));
-	glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
+		glUniformMatrix4fv(modelMatLoc, 1, GL_FALSE, value_ptr(modelMat));
 
-	glUniform4f(objColorLoc, 0.96, 0.87, 0.70, 1.0);
-	buns.DrawObject(vao[22], objectLoc, 23);
-	glUniform4f(objColorLoc, 0.64, 0.16, 0.16, 1.0);
-	meat.DrawObject(vao[23], objectLoc, 24);
-	glUniform4f(objColorLoc, 0.5, 0.5, 0.0, 1.0);
-	cheese.DrawObject(vao[24], objectLoc, 25);
-	glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
-	tomato.DrawObject(vao[25], objectLoc, 26);
-	//seeds.DrawObject(vao[26], objectLoc, 27);
+		glUniform4f(objColorLoc, 0.96, 0.87, 0.70, 1.0);
+		buns.DrawObject(vao[22], objectLoc, 23);
+		glUniform4f(objColorLoc, 0.64, 0.16, 0.16, 1.0);
+		meat.DrawObject(vao[23], objectLoc, 24);
+		glUniform4f(objColorLoc, 0.5, 0.5, 0.0, 1.0);
+		cheese.DrawObject(vao[24], objectLoc, 25);
+		glUniform4f(objColorLoc, 1.0, 0.0, 0.0, 1.0);
+		tomato.DrawObject(vao[25], objectLoc, 26);
+		//seeds.DrawObject(vao[26], objectLoc, 27);
 
 	//Angle corrections
 	if (theta > 360)
@@ -1074,23 +1068,10 @@ void idle()
 	glutPostRedisplay();
 }
 
-void generateOffsets()
-{
-	/*offsets[0] = glm::vec2(10, 40);
-	offsets[1] = glm::vec2(5, 45);
-
-	for (int i = 0; i < 1; i++)
-	{
-		glUniform2f(glGetUniformLocation(programId, "offsets[" + i + "]"), offsets[i].x, offsets[i].y);
-	}*/
-}
-
 
 // Main routine.
 int main(int argc, char* argv[])
 {
-	generateOffsets();
-
 	glutInit(&argc, argv);
 
 	glutInitContextVersion(4, 3);
@@ -1230,7 +1211,7 @@ int main(int argc, char* argv[])
 			toon ++;
 			if (toon > 3)
 				toon = 0;
-			setup();
+			switchShaders();
 		}
 		else if (key == 'm')
 		{
@@ -1241,6 +1222,15 @@ int main(int argc, char* argv[])
 		{
 			normalMapping *= -1;
 			glUniform1i(normalMappingLoc, normalMapping);
+		}
+		else if (key == 'l')
+		{
+		wind *= -1;
+
+		}
+		else if (key == 'k')
+		{
+			airDragOn *= -1;
 		}
 	});
 
@@ -1272,14 +1262,6 @@ int main(int argc, char* argv[])
 
 	glutMainLoop();
 }
-//Fix normal mapping - kinda doneeeee
 //Fix ball wall collision
-//Fix curved shot angle
-//Take look at physics code
-//https://gamedev.stackexchange.com/questions/79459/2d-outline-shader-in-glsl
-//http://in2gpu.com/2014/06/23/toon-shading-effect-and-simple-contour-detection/
 
 //Draw object outline: use stencil buffer / draw object twice, cull backfaces / edge detection post-processing / some geometry shader stuff
-//Add air drag
-//weather physics effect
-//Instantiate trees - add values

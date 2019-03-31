@@ -28,21 +28,15 @@ public:
 	glm::mat4 modelMat;
 	glm::vec3 heading; ///<Starting facing direction of the Hovercraft.
 	float colRadius;
-	float testAngle = 0.0f;
-
-	glm::vec3 position0;
 
 	Ball(glm::vec3 position, glm::vec3 cameraFront, unsigned int objectLoc, unsigned int modelMatLoc, float speed, float angle, float rotation, float mass);
 	~Ball();
 
-	void update(int deltaTime, unsigned int programId, unsigned int modelMatLoc);
 	float magnitude(glm::vec3 a);
 	void collides(Ball* otherBall, float materialBounce = 1.0f); ///<Virtual function to notify this game object that a collision has happened can be overridden (optional).
 	void collidesWall(CubeCollider* other);
 
 	void SetupDrawing(unsigned int vao, unsigned int vbo, int locationVert, int locationTex, int locationNormals);
-	void DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime);
-
-	void DrawCollider();
+	void DrawObject(unsigned int vao, unsigned int objectLoc, unsigned int obj, unsigned int modelMatLoc, int deltaTime, int wind, int airDragOn);
 };
 

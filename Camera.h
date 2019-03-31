@@ -51,7 +51,7 @@ public:
 	Camera(unsigned int programId, float cameraAngle, float width, float height, float Near, float Far, unsigned int vao, unsigned int buffer, unsigned int objectLoc, unsigned int modelMatLoc);
 	~Camera();
 
-	void update(int deltaTime, float ballAngle, float ballRotation);
+	void update(int deltaTime, float ballAngle, float ballRotation, int wind, int airDragOn);
 
 	void mouseControl(int key, int state, int x, int y, unsigned int objectLoc, unsigned int modelMatLoc, float speed, float angle, float rotation);
 
